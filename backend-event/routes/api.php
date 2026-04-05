@@ -2,7 +2,12 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\EventController;
+use App\Http\Controllers\PendaftaranEventController;
+use App\Http\Controllers\KontakEventController;
+use App\Http\Controllers\PembayaranController;
+use App\Http\Controllers\MetodePembayaranController;
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -17,3 +22,26 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
+Route::post('/register', [AuthController::class, 'register']);
+Route::post('/login', [AuthController::class, 'login']);
+
+Route::get('/event', [EventController::class, 'index']);
+Route::get('/event/{id}', [EventController::class, 'show']);
+Route::post('/event', [EventController::class, 'store']);
+Route::put('/event/{id}', [EventController::class, 'update']);
+Route::delete('/event/{id}', [EventController::class, 'destroy']);
+
+Route::post('/daftar-event', [PendaftaranEventController::class, 'store']);
+
+Route::post('/kontak-event',[KontakEventController::class,'store']);
+Route::get('/kontak-event',[KontakEventController::class,'index']);
+Route::put('/kontak-event/{id}',[KontakEventController::class,'update']);
+
+Route::get('/pembayaran', [PembayaranController::class, 'index']);
+Route::post('/pembayaran', [PembayaranController::class, 'store']);
+Route::get('/pembayaran/{id}', [PembayaranController::class, 'show']);
+Route::put('/pembayaran/{id}/verifikasi', [PembayaranController::class, 'verifikasi']);
+
+Route::get('/metode-pembayaran', [MetodePembayaranController::class, 'index']);
+Route::post('/metode-pembayaran', [MetodePembayaranController::class, 'store']);
+Route::get('/metode-pembayaran/{id}', [MetodePembayaranController::class, 'show']);
