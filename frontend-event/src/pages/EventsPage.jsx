@@ -1,11 +1,30 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import NavbarCustom from "../components/Navbar.jsx";
 import Footer from "../components/Footer.jsx";
 import "../styles/EventsPage.css";
 import "../styles/Footer.css";
 import { Search } from "lucide-react";
+import { buildApiUrl } from "../utils/api";
+
+const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1505373876077-705f7919a43b?w=1200&q=80";
+
+function normalizeEvent(event) {
+  return {
+    id: event.id || event.id_event,
+    title: event.title || event.nama_event || "Untitled Event",
+    date: event.date || event.tanggal || "-",
+    location: event.location || event.lokasi || "-",
+    category: event.category || "Event",
+    organizer: event.organizer || "Panitia Event",
+    description: event.description || event.deskripsi || "Deskripsi belum tersedia.",
+    buttonLabel: event.buttonLabel || "Lihat Detail",
+    foto_event_url: event.foto_event_url || (event.foto_event ? buildApiUrl(`/event/${event.foto_event}`) : FALLBACK_IMAGE),
+  };
+}
 
 const EventsPage = () => {
+  const navigate = useNavigate();
   const [events, setEvents] = useState([]);
   const [filteredEvents, setFilteredEvents] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -27,10 +46,10 @@ const EventsPage = () => {
   // Fetch semua events
   useEffect(() => {
     setLoading(true);
-    fetch("http://localhost:8000/api/events")
+    fetch(buildApiUrl("/api/event"))
       .then((res) => res.json())
       .then((data) => {
-        const eventList = Array.isArray(data) ? data : [];
+        const eventList = (Array.isArray(data) ? data : []).map(normalizeEvent);
         setEvents(eventList);
         setFilteredEvents(eventList);
         setLoading(false);
@@ -141,8 +160,7 @@ const EventsPage = () => {
 
     // Filter by category
     if (selectedCategory !== "Semua") {
-      const allowed = categoryMappings[selectedCategory] || [selectedCategory];
-      filtered = filtered.filter((event) => allowed.includes(event.category));
+      filtered = filtered.filter((event) => event.category === selectedCategory);
     }
 
     // Filter by search term
@@ -168,15 +186,10 @@ const EventsPage = () => {
     setFilteredEvents(filtered);
   }, [searchTerm, selectedCategory, events, sortBy]);
 
-  // Kategori event statis sesuai permintaan
-  const categories = ["Semua", "Seminar & webinar", "Workshop & Pelatihan", "Kompetisi", "Acara kampus"];
-
-  const categoryMappings = {
-    "Seminar & webinar": ["Seminar & webinar", "Seminar", "Webinar", "Online Webinar"],
-    "Workshop & Pelatihan": ["Workshop & Pelatihan", "Workshop", "Training"],
-    "Kompetisi": ["Kompetisi", "Competition", "Game"],
-    "Acara kampus": ["Acara kampus", "Campus", "Campus Event"]
-  };
+  const categories = useMemo(() => {
+    const uniq = Array.from(new Set(events.map((event) => event.category).filter(Boolean)));
+    return ["Semua", ...uniq];
+  }, [events]);
 
 
   const handleSearch = (e) => {
@@ -307,9 +320,14 @@ const EventsPage = () => {
                     >
                       <div className="events-card-header">
                         <div className="events-card-image">
-                          <div className="events-card-gradient" style={{
-                            background: generateGradient(event.category)
-                          }} />
+                          <img
+                            src={event.foto_event_url}
+                            alt={event.title}
+                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                            onError={(e) => {
+                              e.currentTarget.src = FALLBACK_IMAGE;
+                            }}
+                          />
                           <span className="events-card-badge">{event.category}</span>
                         </div>
                       </div>
@@ -336,9 +354,10 @@ const EventsPage = () => {
                           <button 
                             type="button" 
                             className="btn-event-primary"
+                            onClick={() => navigate(`/events/${event.id}/ticket`)}
                             aria-label={`${event.buttonLabel || "Lihat Detail"} untuk ${event.title}`}
                           >
-                            {event.buttonLabel || "Lihat Detail"}
+                            {event.buttonLabel || "Beli Tiket"}
                           </button>
                           <a 
                             href="#" 
@@ -372,21 +391,5 @@ const EventsPage = () => {
     </div>
   );
 };
-
-// Helper function untuk generate gradient berdasarkan category
-function generateGradient(category) {
-  const gradients = {
-    "Music & Festival": "linear-gradient(135deg, #7c3aed, #a78bfa)",
-    "Business & Career": "linear-gradient(135deg, #a855f7, #c084fc)",
-    "Conference": "linear-gradient(135deg, #0ea5e9, #22c55e)",
-    "Workshop": "linear-gradient(135deg, #f97316, #fb7185)",
-    "Game": "linear-gradient(135deg, #22c55e, #a3e635)",
-    "Expo": "linear-gradient(135deg, #06b6d4, #6366f1)",
-    "Training": "linear-gradient(135deg, #ec4899, #f43f5e)",
-    "Business": "linear-gradient(135deg, #f59e0b, #d97706)",
-    "Semua": "linear-gradient(135deg, #667eea, #764ba2)",
-  };
-  return gradients[category] || "linear-gradient(135deg, #667eea, #764ba2)";
-}
 
 export default EventsPage;

@@ -17,4 +17,19 @@ class PendaftaranEvent extends Model
         'tanggal_daftar',
         'status_pendaftaran'
     ];
+
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'user_id', 'id_user');
+    }
+
+    public function event()
+    {
+        return $this->belongsTo(Event::class, 'event_id');
+    }
+
+    public function pembayaran()
+    {
+        return $this->hasMany(Pembayaran::class, 'pendaftaran_id');
+    }
 }

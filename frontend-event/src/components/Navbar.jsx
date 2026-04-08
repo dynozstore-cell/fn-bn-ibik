@@ -6,6 +6,13 @@ import { Link } from 'react-router-dom';
 const NavbarCustom = () => {
   const [scrolled, setScrolled] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  let authUser = {};
+  try {
+    authUser = JSON.parse(localStorage.getItem("auth_user") || "{}");
+  } catch {
+    authUser = {};
+  }
+  const isAdmin = authUser?.role === "admin";
 
   useEffect(() => {
     const handleScroll = () => {
@@ -38,10 +45,11 @@ const NavbarCustom = () => {
             <Nav.Link as={Link} to="/" onClick={() => setExpanded(false)}>Beranda</Nav.Link>
             <Nav.Link as={Link} to="/events" onClick={() => setExpanded(false)}>Event</Nav.Link>
             <Nav.Link as={Link} to="/contact" onClick={() => setExpanded(false)}>Kontak</Nav.Link>
+            {isAdmin ? <Nav.Link as={Link} to="/admin/events" onClick={() => setExpanded(false)}>Admin</Nav.Link> : null}
           </Nav>
           <div className="d-flex gap-2">
-            <button className="btn btn-outline-purple">Masuk</button>
-            <button className="btn btn-purple">Daftar</button>
+            <Link to="/auth" className="btn btn-outline-purple" onClick={() => setExpanded(false)}>Masuk</Link>
+            <Link to="/auth" className="btn btn-purple" onClick={() => setExpanded(false)}>Daftar</Link>
           </div>
         </Navbar.Collapse>
       </Container>

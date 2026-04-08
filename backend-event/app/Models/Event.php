@@ -16,6 +16,12 @@ class Event extends Model
     'deskripsi',
     'tanggal',
     'lokasi',
+    'harga',
     'foto_event'
 ];
+
+    public function kategori()
+    {
+        return $this->belongsTo(Kategori::class, 'kategori_id');
+    }
 }

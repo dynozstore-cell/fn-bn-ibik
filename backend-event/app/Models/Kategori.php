@@ -10,4 +10,9 @@ class Kategori extends Model
     use HasFactory;
 
     protected $table = 'kategori';
+
+    public function events()
+    {
+        return $this->hasMany(Event::class, 'kategori_id');
+    }
 }

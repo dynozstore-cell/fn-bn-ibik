@@ -4,20 +4,30 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Event;
+use Illuminate\Support\Facades\Auth;
 
 class EventController extends Controller
 {
+    private function transformEvent($event)
+    {
+        $event->foto_event_url = $event->foto_event ? url('event/' . $event->foto_event) : null;
+        $event->category = optional($event->kategori)->nama_kategori ?? 'Tanpa Kategori';
+        return $event;
+    }
 
     // READ semua data
     public function index()
     {
-        return response()->json(Event::all(), 200);
+        $events = Event::with('kategori')->get()->map(function ($event) {
+            return $this->transformEvent($event);
+        });
+        return response()->json($events, 200);
     }
 
     // READ berdasarkan id
     public function show($id)
     {
-        $event = Event::find($id);
+        $event = Event::with('kategori')->find($id);
 
         if (!$event) {
             return response()->json([
@@ -25,13 +35,20 @@ class EventController extends Controller
             ], 404);
         }
 
-        return response()->json($event, 200);
+        return response()->json($this->transformEvent($event), 200);
     }
 
     // CREATE
     public function store(Request $request)
     {
-        $namaFile = null;
+        $user = Auth::user();
+        if (!$user || $user->role !== 'admin') {
+            return response()->json([
+                'message' => 'Akses ditolak'
+            ], 403);
+        }
+
+        $namaFile = 'default-event.jpg';
 
         if ($request->hasFile('foto_event')) {
             $file = $request->file('foto_event');
@@ -45,18 +62,26 @@ class EventController extends Controller
             'deskripsi' => $request->deskripsi,
             'tanggal' => $request->tanggal,
             'lokasi' => $request->lokasi,
+            'harga' => $request->harga ?? 0,
             'foto_event' => $namaFile
         ]);
 
         return response()->json([
             'message' => 'Event berhasil ditambahkan',
-            'data' => $event
+            'data' => $this->transformEvent($event->load('kategori'))
         ], 201);
     }
 
     // UPDATE
     public function update(Request $request, $id)
     {
+        $user = Auth::user();
+        if (!$user || $user->role !== 'admin') {
+            return response()->json([
+                'message' => 'Akses ditolak'
+            ], 403);
+        }
+
         $event = Event::find($id);
 
         if (!$event) {
@@ -65,7 +90,7 @@ class EventController extends Controller
             ], 404);
         }
 
-        $namaFile = $event->foto_event;
+        $namaFile = $event->foto_event ?: 'default-event.jpg';
 
         if ($request->hasFile('foto_event')) {
             $file = $request->file('foto_event');
@@ -79,18 +104,26 @@ class EventController extends Controller
             'deskripsi' => $request->deskripsi,
             'tanggal' => $request->tanggal,
             'lokasi' => $request->lokasi,
+            'harga' => $request->harga ?? $event->harga,
             'foto_event' => $namaFile
         ]);
 
         return response()->json([
             'message' => 'Event berhasil diupdate',
-            'data' => $event
+            'data' => $this->transformEvent($event->load('kategori'))
         ], 200);
     }
 
     // DELETE
     public function destroy($id)
     {
+        $user = Auth::user();
+        if (!$user || $user->role !== 'admin') {
+            return response()->json([
+                'message' => 'Akses ditolak'
+            ], 403);
+        }
+
         $event = Event::find($id);
 
         if (!$event) {

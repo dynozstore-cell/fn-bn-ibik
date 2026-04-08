@@ -1,8 +1,37 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import "./HomePage.css";
 import "./styles/Footer.css";
 import NavbarCustom from "./components/Navbar.jsx";
+import { buildApiUrl } from "./utils/api";
+
+const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1505373876077-705f7919a43b?w=1200&q=80";
+
+function slugHandle(text) {
+  if (!text || typeof text !== "string") return "eventhub";
+  const s = text.replace(/^@/, "").replace(/\s+/g, "").toLowerCase();
+  return s.slice(0, 24) || "eventhub";
+}
+
+function normalizeEvent(event) {
+  const tanggal = event.tanggal || event.date || "-";
+  const nama = event.nama_event || event.title || "Untitled Event";
+  const orgLabel = event.organizer || event.kategori?.nama_kategori || "Panitia Event";
+  return {
+    ...event,
+    id: event.id || event.id_event,
+    nama_event: nama,
+    title: nama,
+    tanggal,
+    date: tanggal,
+    lokasi: event.lokasi || event.location || "-",
+    organizer: orgLabel,
+    handle: event.penyelenggara_handle || `@${slugHandle(orgLabel)}`,
+    foto_event_url:
+      event.foto_event_url ||
+      (event.foto_event ? buildApiUrl(`/event/${event.foto_event}`) : FALLBACK_IMAGE),
+  };
+}
 
 /** Parse date string "22 Mar 2026" atau "2026-03-22" ke Date (jam 09:00) */
 function parseEventDate(dateStr) {
@@ -23,6 +52,12 @@ function parseEventDate(dateStr) {
     }
   }
   return null;
+}
+
+function formatDateForDisplay(dateStr) {
+  const d = parseEventDate(dateStr);
+  if (!d) return dateStr || "-";
+  return d.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
 }
 
 /** Hitung sisa waktu ke target (days, hours, minutes, seconds) */
@@ -54,13 +89,14 @@ function useCountdown(targetDate) {
   return countdown;
 }
 
-const HERO_CARDS = [
+const HERO_CARDS_FALLBACK = [
   {
     id: "h1",
     title: "Neon Night Festival",
     price: "Rp180rb",
     handle: "@skylineent",
     gradient: "linear-gradient(135deg, #7c3aed, #a78bfa)",
+    imageUrl: null,
   },
   {
     id: "h2",
@@ -68,6 +104,7 @@ const HERO_CARDS = [
     price: "Rp250rb",
     handle: "@techverse",
     gradient: "linear-gradient(135deg, #5b21b6, #8b5cf6)",
+    imageUrl: null,
   },
   {
     id: "h3",
@@ -75,8 +112,57 @@ const HERO_CARDS = [
     price: "Gratis",
     handle: "@mindfulid",
     gradient: "linear-gradient(135deg, #6d28d9, #a78bfa)",
+    imageUrl: null,
   },
 ];
+
+function formatHeroPrice(harga) {
+  const n = Number(harga);
+  if (Number.isNaN(n) || n <= 0) return "Gratis";
+  return `Rp${n.toLocaleString("id-ID")}`;
+}
+
+/**  event terbaru dari backend; slot kosong diisi fallback agar tetap 3 kartu (layout sama) */
+function padHeroCardsToThree(fromApi) {
+  if (fromApi.length >= 3) return fromApi.slice(0, 3);
+  const out = [...fromApi];
+  let fi = 0;
+  while (out.length < 3) {
+    const base = HERO_CARDS_FALLBACK[fi % HERO_CARDS_FALLBACK.length];
+    out.push({
+      ...base,
+      id: `hero-fallback-${fi}-${out.length}`,
+    });
+    fi += 1;
+  }
+  return out;
+}
+
+function buildHeroCardsFromEvents(events) {
+  const gradients = HERO_CARDS_FALLBACK.map((c) => c.gradient);
+  if (!events.length) return HERO_CARDS_FALLBACK;
+
+  const sorted = [...events].sort((a, b) => {
+    const ca = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const cb = b.created_at ? new Date(b.created_at).getTime() : 0;
+    if (cb !== ca) return cb - ca;
+    return (Number(b.id) || 0) - (Number(a.id) || 0);
+  });
+
+  const fromApi = sorted.slice(0, 3).map((ev, i) => {
+    const hasPhoto = Boolean(ev.foto_event && String(ev.foto_event).length > 0);
+    return {
+      id: `hero-${ev.id}`,
+      title: ev.nama_event || ev.title || "Event",
+      price: formatHeroPrice(ev.harga),
+      handle: ev.handle || `@${slugHandle(ev.organizer || ev.kategori?.nama_kategori || "event")}`,
+      gradient: gradients[i % gradients.length],
+      imageUrl: hasPhoto ? ev.foto_event_url || null : null,
+    };
+  });
+
+  return padHeroCardsToThree(fromApi);
+}
 
 const DEFAULT_NEAREST_EVENT = {
   id: 0,
@@ -146,50 +232,106 @@ const DEMO_LATEST_EVENTS = [
   },
 ];
 
-const BANNER_CAROUSEL_DATA = [
+/** Fallback jika belum ada data dari API (isi + eventId null untuk CTA ke katalog) */
+const BANNER_CAROUSEL_FALLBACK = [
   {
     id: "banner-1",
+    eventId: null,
     title: "Neon Night Music Festival",
     subtitle: "Pengalaman musik terbaik tahun ini",
-    date: "22 Mar 2026",
+    date: "22 MAR 2026",
     image: "linear-gradient(135deg, #7c3aed, #a78bfa)",
+    foto_event_url: null,
   },
   {
     id: "banner-2",
+    eventId: null,
     title: "Digital Innovation Summit",
     subtitle: "Networking dengan para pemimpin teknologi",
-    date: "05 Apr 2026",
+    date: "05 APR 2026",
     image: "linear-gradient(135deg, #0ea5e9, #22c55e)",
+    foto_event_url: null,
   },
   {
     id: "banner-3",
+    eventId: null,
     title: "Creative Workshop Intensive",
     subtitle: "Tingkatkan skill kreatif Anda bersama expert",
-    date: "19 Apr 2026",
+    date: "19 APR 2026",
     image: "linear-gradient(135deg, #f97316, #fb7185)",
+    foto_event_url: null,
   },
   {
     id: "banner-4",
+    eventId: null,
     title: "Gaming Festival 2026",
     subtitle: "Kompetisi game terbesar se-Indonesia",
-    date: "26 Apr 2026",
+    date: "26 APR 2026",
     image: "linear-gradient(135deg, #22c55e, #a3e635)",
+    foto_event_url: null,
   },
   {
     id: "banner-5",
+    eventId: null,
     title: "Business & Career Fair",
     subtitle: "Cari peluang karir impian Anda",
-    date: "30 Mar 2026",
+    date: "30 MAR 2026",
     image: "linear-gradient(135deg, #a855f7, #c084fc)",
+    foto_event_url: null,
   },
   {
     id: "banner-6",
+    eventId: null,
     title: "Tech Expo Indonesia",
     subtitle: "Showcase inovasi teknologi terdepan",
-    date: "12 Apr 2026",
+    date: "12 APR 2026",
     image: "linear-gradient(135deg, #06b6d4, #6366f1)",
+    foto_event_url: null,
   },
 ];
+
+function truncateBannerText(text, max = 130) {
+  const t = (text || "").trim().replace(/\s+/g, " ");
+  if (t.length <= max) return t;
+  return `${t.slice(0, max - 1)}…`;
+}
+
+/** Slides banner dari event Laravel: terbaru = created_at / id, maksimal 8 slide */
+function buildBannerSlidesFromEvents(events) {
+  const gradients = BANNER_CAROUSEL_FALLBACK.map((b) => b.image);
+  if (!events.length) return BANNER_CAROUSEL_FALLBACK;
+
+  const sorted = [...events].sort((a, b) => {
+    const ca = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const cb = b.created_at ? new Date(b.created_at).getTime() : 0;
+    if (cb !== ca) return cb - ca;
+    const ida = Number(a.id) || 0;
+    const idb = Number(b.id) || 0;
+    return idb - ida;
+  });
+
+  return sorted.slice(0, 8).map((ev, i) => {
+    const rawDesc = (ev.deskripsi || "").trim();
+    const subtitle = rawDesc
+      ? truncateBannerText(rawDesc)
+      : ev.lokasi || ev.category || "Lihat detail dan tiket event ini.";
+    const d = parseEventDate(ev.tanggal || ev.date);
+    const dateBadge = d
+      ? d
+          .toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })
+          .toUpperCase()
+      : String(ev.tanggal || "").toUpperCase();
+    return {
+      id: `banner-${ev.id}`,
+      eventId: ev.id,
+      title: ev.nama_event || ev.title || "Event",
+      subtitle,
+      date: dateBadge,
+      image: gradients[i % gradients.length],
+      foto_event_url: ev.foto_event_url || null,
+    };
+  });
+}
 
 const NEWS_DATA = [
   {
@@ -296,122 +438,82 @@ export default function HomePage() {
     return [...sixCards, ...sixCards, ...sixCards];
   }, [latestList]);
 
-  const nearestEvent = useMemo(() => {
-    if (!events.length) return DEFAULT_NEAREST_EVENT;
-    const withDate = events
-      .map((e) => ({ ...e, parsed: parseEventDate(e.date) }))
-      .filter((e) => e.parsed && e.parsed > new Date());
-    if (!withDate.length) return events[0] ? { ...events[0], ...DEFAULT_NEAREST_EVENT } : DEFAULT_NEAREST_EVENT;
-    withDate.sort((a, b) => a.parsed - b.parsed);
-    return { ...withDate[0], imageGradient: "linear-gradient(135deg, #7c3aed, #a78bfa)" };
+  /** Event dengan tanggal > sekarang, urut dari yang paling dekat (nyambung ke kolom tanggal di DB) */
+  const upcomingEvents = useMemo(() => {
+    if (!events.length) return [];
+    const now = new Date();
+    return events
+      .map((e) => ({ ...e, parsed: parseEventDate(e.tanggal || e.date) }))
+      .filter((e) => e.parsed && e.parsed.getTime() > now.getTime())
+      .sort((a, b) => a.parsed - b.parsed);
   }, [events]);
 
-  const targetDate = useMemo(() => parseEventDate(nearestEvent.date), [nearestEvent.date]);
+  const [upcomingCarouselIdx, setUpcomingCarouselIdx] = useState(0);
+
+  useEffect(() => {
+    setUpcomingCarouselIdx(0);
+  }, [upcomingEvents.map((e) => e.id).join(",")]);
+
+  useEffect(() => {
+    if (upcomingCarouselIdx >= upcomingEvents.length && upcomingEvents.length > 0) {
+      setUpcomingCarouselIdx(0);
+    }
+  }, [upcomingEvents.length, upcomingCarouselIdx]);
+
+  const activeUpcoming =
+    upcomingEvents.length > 0
+      ? upcomingEvents[Math.min(upcomingCarouselIdx, upcomingEvents.length - 1)]
+      : null;
+
+  const countdownDisplay = useMemo(() => {
+    if (activeUpcoming) {
+      return {
+        ...activeUpcoming,
+        dateLabel: formatDateForDisplay(activeUpcoming.tanggal || activeUpcoming.date),
+        imageGradient: "linear-gradient(135deg, #7c3aed, #a78bfa)",
+      };
+    }
+    if (!events.length) {
+      return {
+        ...DEFAULT_NEAREST_EVENT,
+        tanggal: DEFAULT_NEAREST_EVENT.date,
+        date: DEFAULT_NEAREST_EVENT.date,
+        dateLabel: DEFAULT_NEAREST_EVENT.date,
+        foto_event_url: null,
+        id: null,
+      };
+    }
+    return null;
+  }, [activeUpcoming, events.length]);
+
+  const targetDate = useMemo(
+    () => (countdownDisplay ? parseEventDate(countdownDisplay.tanggal || countdownDisplay.date) : null),
+    [countdownDisplay]
+  );
   const countdown = useCountdown(targetDate);
 
+  const shiftUpcoming = (dir) => {
+    if (upcomingEvents.length <= 1) return;
+    setUpcomingCarouselIdx((i) => (i + dir + upcomingEvents.length) % upcomingEvents.length);
+  };
+
+  const bannerCarouselList = useMemo(() => buildBannerSlidesFromEvents(events), [events]);
+
+  const heroCards = useMemo(() => buildHeroCardsFromEvents(events), [events]);
+
   useEffect(() => {
-    fetch("http://localhost:8000/api/events/featured")
+    fetch(buildApiUrl("/api/event"))
       .then((res) => res.json())
-      .then((data) => setEvents(data))
-      .catch(() => {
-        setEvents([
-          {
-            id: 1,
-            title: "Neon Night Music Festival Bandung",
-            date: "22 Mar 2026",
-            location: "Bandung, Jawa Barat",
-            category: "Music & Festival",
-            organizer: "Skyline Entertainment",
-            buttonLabel: "Beli Tiket",
-          },
-          {
-            id: 2,
-            title: "Success Free Career & Meditation Classes",
-            date: "30 Mar 2026",
-            location: "Online Webinar",
-            category: "Business & Career",
-            organizer: "Mindful Growth ID",
-            buttonLabel: "Daftar Sekarang",
-          },
-          {
-            id: 3,
-            title: "Digital Innovation Summit 2026",
-            date: "05 Apr 2026",
-            location: "Surabaya, Jawa Timur",
-            category: "Conference",
-            organizer: "TechVerse ID",
-            buttonLabel: "Beli Tiket",
-          },
-          {
-            id: 4,
-            title: "Creators Meetup: UI Motion Lab",
-            date: "19 Apr 2026",
-            location: "Yogyakarta, DIY",
-            category: "Workshop",
-            organizer: "MotionLab",
-            buttonLabel: "Daftar Sekarang",
-          },
-          {
-            id: 5,
-            title: "Indie Game Jam Weekend",
-            date: "26 Apr 2026",
-            location: "Online",
-            category: "Game",
-            organizer: "IndieHub",
-            buttonLabel: "Bergabung",
-          },
-          {
-            id: 6,
-            title: "Lunar Arcade Showcase",
-            date: "12 Apr 2026",
-            location: "Jakarta, Indonesia",
-            category: "Expo",
-            organizer: "ArcadeWorks",
-            buttonLabel: "Beli Tiket",
-          },
-          {
-            id: 7,
-            title: "Web Development Bootcamp",
-            date: "14 Apr 2026",
-            location: "Bandung, Jawa Barat",
-            category: "Training",
-            organizer: "CodeMaster Academy",
-            buttonLabel: "Daftar Sekarang",
-          },
-          {
-            id: 8,
-            title: "Design Thinking Workshop",
-            date: "20 Apr 2026",
-            location: "Jakarta, Indonesia",
-            category: "Workshop",
-            organizer: "Creative Studio ID",
-            buttonLabel: "Daftar Sekarang",
-          },
-          {
-            id: 9,
-            title: "Startup Pitch Competition",
-            date: "25 Apr 2026",
-            location: "Jakarta, Indonesia",
-            category: "Business",
-            organizer: "Tech Founders Indonesia",
-            buttonLabel: "Daftar Tim",
-          },
-        ]);
-      });
+      .then((data) => {
+        const list = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
+        const mapped = list.map(normalizeEvent);
+        setEvents(mapped);
+        setLatestEvents(mapped);
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
-    fetch("http://localhost:8000/api/events/latest")
-      .then((res) => res.json())
-      .then((data) => setLatestEvents(Array.isArray(data) ? data : []))
-      .catch(() => {
-        // fallback: gunakan data featured untuk demo local
-        setLatestEvents((prev) => (prev.length ? prev : []));
-      });
-  }, []);
-
-  useEffect(() => {
-    // jika endpoint latest belum tersedia, pakai featured sebagai fallback
     if (!latestEvents.length && events.length) setLatestEvents(events);
   }, [events, latestEvents.length]);
 
@@ -608,7 +710,7 @@ export default function HomePage() {
   };
 
   const scrollBanner = (dir) => {
-    const len = BANNER_CAROUSEL_DATA.length;
+    const len = bannerCarouselList.length;
     if (len === 0) return;
 
     let newIdx = activeBannerIdx + dir;
@@ -638,7 +740,7 @@ export default function HomePage() {
 
   const handleBannerSlideClick = (idx) => {
     if (isBannerDraggingRef.current) return;
-    const len = BANNER_CAROUSEL_DATA.length;
+    const len = bannerCarouselList.length;
     const realIdx = ((idx % len) + len) % len;
     const targetIdx = realIdx + len;
     scrollBannerToIdx(targetIdx);
@@ -648,7 +750,7 @@ export default function HomePage() {
   const ensureBannerInMiddleLoop = () => {
     const el = bannerRowRef.current;
     if (!el) return;
-    const len = BANNER_CAROUSEL_DATA.length;
+    const len = bannerCarouselList.length;
 
     const first = el.querySelector(".banner-slide");
     if (!first) return;
@@ -717,19 +819,19 @@ export default function HomePage() {
     }
   };
 
-  // Banner Carousel: Initialize middle position
+  // Banner Carousel: Initialize middle position (ulang saat daftar slide dari API berubah)
   useEffect(() => {
     const el = bannerRowRef.current;
-    if (!el) return;
+    if (!el || !bannerCarouselList.length) return;
 
     const timer = setTimeout(() => {
-      const len = BANNER_CAROUSEL_DATA.length;
+      const len = bannerCarouselList.length;
       scrollBannerToIdx(len);
       setActiveBannerIdx(len);
     }, 100);
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [bannerCarouselList.length, bannerCarouselList.map((b) => b.id).join(",")]);
 
   // Banner Carousel: Scroll event listener
   useEffect(() => {
@@ -755,13 +857,14 @@ export default function HomePage() {
 
   // Banner Carousel: Autoplay
   useEffect(() => {
+    if (!bannerCarouselList.length) return undefined;
     const interval = setInterval(() => {
       if (isBannerPausedRef.current) return;
       scrollBanner(1);
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [activeBannerIdx]);
+  }, [activeBannerIdx, bannerCarouselList.length]);
 
   return (
     <div className="page flacto-style">
@@ -782,10 +885,18 @@ export default function HomePage() {
                 workshop — dari berbagai organizer terpercaya dalam satu platform.
               </p>
               <div className="hero-actions">
-                <button type="button" className="btn btn-explore">
+                <button
+                  type="button"
+                  className="btn btn-explore"
+                  onClick={() => navigate("/events")}
+                >
                   Jelajahi Event
                 </button>
-                <button type="button" className="btn btn-outline-white">
+                <button
+                  type="button"
+                  className="btn btn-outline-white"
+                  onClick={() => document.getElementById("event-terbaru")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                >
                   Cara Kerja?
                 </button>
               </div>
@@ -802,14 +913,22 @@ export default function HomePage() {
             </div>
 
             <div className="hero-cards">
-              {HERO_CARDS.map((card, i) => (
+              {heroCards.map((card, i) => (
                 <div
                   key={card.id}
                   className={`hero-nft-card hero-nft-card--${i + 1}`}
                 >
                   <div
                     className="hero-nft-card-image"
-                    style={{ background: card.gradient }}
+                    style={
+                      card.imageUrl
+                        ? {
+                            backgroundImage: `url(${card.imageUrl})`,
+                            backgroundSize: "cover",
+                            backgroundPosition: "center",
+                          }
+                        : { background: card.gradient }
+                    }
                   />
                   <div className="hero-nft-card-body">
                     <h3 className="hero-nft-card-title">{card.title}</h3>
@@ -850,8 +969,8 @@ export default function HomePage() {
                 onBlur={() => { isBannerPausedRef.current = false; }}
               >
               {Array.from({ length: 3 }).flatMap((_, loopIdx) =>
-                BANNER_CAROUSEL_DATA.map((banner, idx) => {
-                  const loopIdx_ = activeBannerIdx % BANNER_CAROUSEL_DATA.length;
+                bannerCarouselList.map((banner, idx) => {
+                  const loopIdx_ = activeBannerIdx % bannerCarouselList.length;
                   const isActive = idx === loopIdx_;
                   return (
                     <div
@@ -871,7 +990,15 @@ export default function HomePage() {
                     >
                       <div
                         className="banner-slide-bg"
-                        style={{ background: banner.image }}
+                        style={
+                          banner.foto_event_url
+                            ? {
+                                backgroundImage: `linear-gradient(135deg, rgba(15,13,26,0.82), rgba(30,26,46,0.4)), url(${banner.foto_event_url})`,
+                                backgroundSize: "cover",
+                                backgroundPosition: "center",
+                              }
+                            : { background: banner.image }
+                        }
                         aria-hidden="true"
                       />
                       <div className="banner-slide-overlay" />
@@ -879,7 +1006,15 @@ export default function HomePage() {
                         <span className="banner-badge">{banner.date}</span>
                         <h2 className="banner-title">{banner.title}</h2>
                         <p className="banner-subtitle">{banner.subtitle}</p>
-                        <button type="button" className="banner-cta">
+                        <button
+                          type="button"
+                          className="banner-cta"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (banner.eventId != null) navigate(`/events/${banner.eventId}`);
+                            else navigate("/events");
+                          }}
+                        >
                           Lihat Event →
                         </button>
                       </div>
@@ -903,8 +1038,8 @@ export default function HomePage() {
 
           {/* Banner Dots - Below carousel */}
           <div className="banner-dots-container" role="tablist" aria-label="Slide indicators">
-            {BANNER_CAROUSEL_DATA.map((_, idx) => {
-              const loopIdx = activeBannerIdx % BANNER_CAROUSEL_DATA.length;
+            {bannerCarouselList.map((_, idx) => {
+              const loopIdx = activeBannerIdx % bannerCarouselList.length;
               const isActive = idx === loopIdx;
               return (
                 <button
@@ -914,7 +1049,7 @@ export default function HomePage() {
                   role="tab"
                   aria-selected={isActive}
                   onClick={() => {
-                    const len = BANNER_CAROUSEL_DATA.length;
+                    const len = bannerCarouselList.length;
                     const targetIdx = idx + len;
                     scrollBannerToIdx(targetIdx);
                     setActiveBannerIdx(targetIdx);
@@ -926,7 +1061,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="section featured-section">
+        <section id="event-terbaru" className="section featured-section">
           <div className="section-inner container">
             <header className="section-header">
               <h2 className="section-title">Event Terbaru</h2>
@@ -947,23 +1082,31 @@ export default function HomePage() {
                     animationDelay: `var(--card-delay)`
                   }}
                 >
-                  <div className="event-card-media">
+                  <div className="event-card-media" style={{ padding: 0, overflow: "hidden" }}>
+                    <img
+                      src={event.foto_event_url}
+                      alt={event.nama_event}
+                      style={{ width: "100%", height: "100%", objectFit: "cover", minHeight: 180 }}
+                      onError={(e) => {
+                        e.currentTarget.src = FALLBACK_IMAGE;
+                      }}
+                    />
                     <div className="event-card-tag">{event.category}</div>
                   </div>
                   <div className="event-card-body">
-                    <h3 className="event-title">{event.title}</h3>
+                    <h3 className="event-title">{event.nama_event}</h3>
                     <div className="event-meta">
-                      <span className="event-meta-item">📅 {event.date}</span>
-                      <span className="event-meta-item">📍 {event.location}</span>
+                      <span className="event-meta-item">📅 {event.tanggal}</span>
+                      <span className="event-meta-item">📍 {event.lokasi}</span>
                     </div>
                     <p className="event-organizer">
                       Oleh <strong>{event.organizer}</strong>
                     </p>
                     <div className="event-actions">
-                      <button type="button" className="event-btn">
+                      <Link to={`/events/${event.id}/ticket`} className="event-btn">
                         {event.buttonLabel || "Beli Tiket"}
-                      </button>
-                      <a href="#" className="event-link">Detail</a>
+                      </Link>
+                      <Link to={`/events/${event.id}`} className="event-link">Detail</Link>
                     </div>
                   </div>
                 </article>
@@ -983,66 +1126,122 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Countdown Event Terdekat */}
+        {/* Countdown: event dari API yang tanggalnya masanya mendatang + urut paling dekat */}
         <section className="countdown-section">
           <div className="container countdown-inner">
             <header className="countdown-header">
               <h2 className="countdown-section-title">Event yang Akan Datang</h2>
               <p className="countdown-section-subtitle">
-                Jangan lewatkan moment spesial ini!
+                {upcomingEvents.length > 0
+                  ? "Jangan lewatkan moment spesial ini!"
+                  : events.length > 0
+                    ? "Saat ini belum ada jadwal mendatang di katalog."
+                    : "Jangan lewatkan moment spesial ini!"}
               </p>
             </header>
-            <div className="countdown-card">
-              <div
-                className="countdown-image"
-                style={{
-                  background: nearestEvent.imageGradient || "linear-gradient(135deg, #7c3aed, #a78bfa)",
-                }}
-              />
-              <div className="countdown-info">
-                <p className="countdown-date">{nearestEvent.date}</p>
-                <h2 className="countdown-title">{nearestEvent.title}</h2>
-                <p className="countdown-label">Event dimulai dalam</p>
-                <div className="countdown-boxes">
-                  <div className="countdown-box">
-                    <span className="countdown-num">{String(countdown.days).padStart(2, "0")}</span>
-                    <span className="countdown-unit">hari</span>
+
+            {!countdownDisplay && events.length > 0 ? (
+              <div className="countdown-empty card rounded-3 border border-secondary border-opacity-25 p-4 p-md-5 text-center bg-dark bg-opacity-25">
+                <p className="mb-4 text-white-50">
+                  Tambah atau perbarui event di admin dengan tanggal ke depan agar muncul di sini — atau buka katalog.
+                </p>
+                <button type="button" className="btn-countdown-primary" onClick={() => navigate("/events")}>
+                  Lihat semua event
+                </button>
+              </div>
+            ) : countdownDisplay ? (
+              <div className="countdown-card">
+                <div
+                  className={`countdown-image${countdownDisplay.foto_event_url ? " countdown-image--photo" : ""}`}
+                  style={
+                    countdownDisplay.foto_event_url
+                      ? {
+                          backgroundImage: `linear-gradient(135deg, rgba(15,13,26,0.75), rgba(30,26,46,0.35)), url(${countdownDisplay.foto_event_url})`,
+                          backgroundSize: "cover",
+                          backgroundPosition: "center",
+                        }
+                      : {
+                          background:
+                            countdownDisplay.imageGradient || "linear-gradient(135deg, #7c3aed, #a78bfa)",
+                        }
+                  }
+                  role="img"
+                  aria-label={countdownDisplay.title}
+                />
+                <div className="countdown-info">
+                  <p className="countdown-date">
+                    {upcomingEvents.length > 1 ? `${upcomingCarouselIdx + 1} / ${upcomingEvents.length} · ` : ""}
+                    {countdownDisplay.dateLabel}
+                  </p>
+                  <h2 className="countdown-title">{countdownDisplay.title}</h2>
+                  <p className="countdown-label">Event dimulai dalam</p>
+                  <div className="countdown-boxes">
+                    <div className="countdown-box">
+                      <span className="countdown-num">{String(countdown.days).padStart(2, "0")}</span>
+                      <span className="countdown-unit">hari</span>
+                    </div>
+                    <div className="countdown-box">
+                      <span className="countdown-num">{String(countdown.hours).padStart(2, "0")}</span>
+                      <span className="countdown-unit">jam</span>
+                    </div>
+                    <div className="countdown-box">
+                      <span className="countdown-num">{String(countdown.minutes).padStart(2, "0")}</span>
+                      <span className="countdown-unit">menit</span>
+                    </div>
+                    <div className="countdown-box">
+                      <span className="countdown-num">{String(countdown.seconds).padStart(2, "0")}</span>
+                      <span className="countdown-unit">detik</span>
+                    </div>
                   </div>
-                  <div className="countdown-box">
-                    <span className="countdown-num">{String(countdown.hours).padStart(2, "0")}</span>
-                    <span className="countdown-unit">jam</span>
+                  <div className="countdown-owner">
+                    <div className="countdown-owner-avatar" />
+                    <span className="countdown-owner-label">Penyelenggara</span>
+                    <span className="countdown-owner-handle">
+                      {countdownDisplay.handle ||
+                        `@${(countdownDisplay.organizer || "").replace(/\s+/g, "").toLowerCase()}`}
+                    </span>
                   </div>
-                  <div className="countdown-box">
-                    <span className="countdown-num">{String(countdown.minutes).padStart(2, "0")}</span>
-                    <span className="countdown-unit">menit</span>
-                  </div>
-                  <div className="countdown-box">
-                    <span className="countdown-num">{String(countdown.seconds).padStart(2, "0")}</span>
-                    <span className="countdown-unit">detik</span>
-                  </div>
-                </div>
-                <div className="countdown-owner">
-                  <div className="countdown-owner-avatar" />
-                  <span className="countdown-owner-label">Penyelenggara</span>
-                  <span className="countdown-owner-handle">
-                    {nearestEvent.handle || `@${(nearestEvent.organizer || "").replace(/\s+/g, "").toLowerCase()}`}
-                  </span>
-                </div>
-                <div className="countdown-actions">
-                  <button type="button" className="btn-countdown-primary">
-                    Lihat Semua Upcoming
-                  </button>
-                  <div className="countdown-nav">
-                    <button type="button" className="countdown-nav-btn" aria-label="Sebelumnya">
-                      ←
+                  <div className="countdown-actions">
+                    <button
+                      type="button"
+                      className="btn-countdown-primary"
+                      onClick={() => navigate("/events")}
+                    >
+                      Lihat Semua Upcoming
                     </button>
-                    <button type="button" className="countdown-nav-btn countdown-nav-btn--active" aria-label="Selanjutnya">
-                      →
-                    </button>
+                    {countdownDisplay.id ? (
+                      <Link
+                        to={`/events/${countdownDisplay.id}`}
+                        className="btn btn-outline-light btn-sm align-self-center"
+                        style={{ borderRadius: "10px" }}
+                      >
+                        Detail
+                      </Link>
+                    ) : null}
+                    <div className="countdown-nav">
+                      <button
+                        type="button"
+                        className="countdown-nav-btn"
+                        aria-label="Event mendatang sebelumnya"
+                        onClick={() => shiftUpcoming(-1)}
+                        disabled={upcomingEvents.length <= 1}
+                      >
+                        ←
+                      </button>
+                      <button
+                        type="button"
+                        className="countdown-nav-btn countdown-nav-btn--active"
+                        aria-label="Event mendatang berikutnya"
+                        onClick={() => shiftUpcoming(1)}
+                        disabled={upcomingEvents.length <= 1}
+                      >
+                        →
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            ) : null}
           </div>
         </section>
 

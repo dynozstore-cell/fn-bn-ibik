@@ -17,4 +17,14 @@ class Pembayaran extends Model
         'bukti_pembayaran',
         'status_pembayaran'
     ];
+
+    public function pendaftaran()
+    {
+        return $this->belongsTo(PendaftaranEvent::class, 'pendaftaran_id');
+    }
+
+    public function metodePembayaran()
+    {
+        return $this->belongsTo(MetodePembayaran::class, 'metode_pembayaran_id');
+    }
 }

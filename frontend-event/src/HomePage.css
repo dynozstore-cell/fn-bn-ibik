@@ -315,6 +315,8 @@ a {
 
 .hero-content {
   max-width: 520px;
+  position: relative;
+  z-index: 2;
 }
 
 .hero-title {
@@ -418,6 +420,7 @@ a {
 /* ----- Hero cards (tilted, dengan jarak) ----- */
 .hero-cards {
   position: relative;
+  z-index: 1;
   height: 420px;
   display: flex;
   align-items: center;
