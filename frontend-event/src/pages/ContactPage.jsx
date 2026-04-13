@@ -2,30 +2,58 @@ import React, { useState } from 'react';
 import NavbarCustom from '../components/Navbar.jsx';
 import Footer from '../components/Footer.jsx';
 import { Phone, Mail, AtSign, MapPin } from 'lucide-react';
+import { buildApiUrl } from '../utils/api.js';
 import '../HomePage.css';
 
 const initialForm = {
-  name: '',
+  nama: '',
   email: '',
-  phone: '',
-  subject: '',
-  message: '',
+  no_hp: '',
+  judul_event: '',
+  deskripsi_event: '',
+  pesan: '',
 };
 
 export default function ContactPage() {
   const [form, setForm] = useState(initialForm);
   const [status, setStatus] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
-    setStatus('Terima kasih! Pesan Anda berhasil dikirim.');
-    setForm(initialForm);
-    setTimeout(() => setStatus(''), 5000);
+    setIsLoading(true);
+    setStatus('');
+
+    try {
+      const response = await fetch(buildApiUrl('/api/kontak-event'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify(form),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setStatus('Terima kasih! Pesan Anda berhasil dikirim.');
+        setForm(initialForm);
+      } else {
+        setStatus(data.message || 'Gagal mengirim pesan. Silakan coba lagi.');
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      setStatus('Terjadi kesalahan. Silakan coba lagi.');
+    } finally {
+      setIsLoading(false);
+      setTimeout(() => setStatus(''), 5000);
+    }
   };
 
   return (
@@ -99,30 +127,35 @@ export default function ContactPage() {
                 <h3>Kirim Pesan</h3>
                 <p>Isi data lengkap agar kami dapat merespons dengan cepat.</p>
                 <form onSubmit={handleSubmit}>
-                  <label htmlFor="name">Nama</label>
-                  <input id="name" name="name" value={form.name} onChange={handleChange} placeholder="Nama Anda" required />
+                  <label htmlFor="nama">Nama</label>
+                  <input id="nama" name="nama" value={form.nama} onChange={handleChange} placeholder="Nama Anda" required />
 
                   <label htmlFor="email">Email</label>
                   <input id="email" name="email" type="email" value={form.email} onChange={handleChange} placeholder="email.anda@contoh.com" required />
 
-                  <label htmlFor="phone">Telepon</label>
-                  <input id="phone" name="phone" type="tel" value={form.phone} onChange={handleChange} placeholder="+62 xxx xxxx xxxx" />
+                  <label htmlFor="no_hp">Telepon</label>
+                  <input id="no_hp" name="no_hp" type="tel" value={form.no_hp} onChange={handleChange} placeholder="+62 xxx xxxx xxxx" />
 
-                  <label htmlFor="subject">Subjek</label>
-                  <input id="subject" name="subject" value={form.subject} onChange={handleChange} placeholder="Tentang apa pesan Anda?" required />
+                  <label htmlFor="judul_event">Subjek</label>
+                  <input id="judul_event" name="judul_event" value={form.judul_event} onChange={handleChange} placeholder="Tentang apa pesan Anda?" required />
 
-                  <label htmlFor="message">Pesan</label>
+                  <label htmlFor="deskripsi_event">Deskripsi</label>
+                  <input id="deskripsi_event" name="deskripsi_event" value={form.deskripsi_event} onChange={handleChange} placeholder="Deskripsi singkat..." />
+
+                  <label htmlFor="pesan">Pesan</label>
                   <textarea
-                    id="message"
-                    name="message"
-                    value={form.message}
+                    id="pesan"
+                    name="pesan"
+                    value={form.pesan}
                     onChange={handleChange}
                     placeholder="Tulis pesan Anda di sini..."
                     rows="5"
                     required
                   />
 
-                  <button type="submit" className="btn-event-primary">Kirim Pesan</button>
+                  <button type="submit" className="btn-event-primary" disabled={isLoading}>
+                    {isLoading ? 'Mengirim...' : 'Kirim Pesan'}
+                  </button>
                   {status && <p className="submit-status">{status}</p>}
                 </form>
               </div>

@@ -345,15 +345,24 @@ export default function AdminEventsPage() {
 
       {tab === "kontak" ? (
         <div className="card"><div className="card-body table-responsive">
+          <h5 className="mb-3">Pesan Masuk dari Contact Page</h5>
           <table className="table table-striped">
-            <thead><tr><th>Nama</th><th>Email</th><th>Judul Event</th><th>Status</th><th>Aksi</th></tr></thead>
+            <thead><tr><th>ID</th><th>Nama</th><th>Email</th><th>No HP</th><th>Judul Event</th><th>Deskripsi</th><th>Pesan</th><th>Status</th><th>Tanggal</th><th>Aksi</th></tr></thead>
             <tbody>{kontakList.map((row) => {
               const id = row.id || row.id_kontak_event;
               return <tr key={id}>
-                <td>{row.nama}</td><td>{row.email}</td><td>{row.judul_event}</td><td>{row.status}</td>
+                <td>{id}</td>
+                <td>{row.nama || "-"}</td>
+                <td>{row.email || "-"}</td>
+                <td>{row.no_hp || "-"}</td>
+                <td>{row.judul_event || "-"}</td>
+                <td style={{maxWidth: '200px'}}>{row.deskripsi_event || "-"}</td>
+                <td style={{maxWidth: '250px'}}>{row.pesan || "-"}</td>
+                <td><span className={`badge ${row.status === 'approved' ? 'bg-success' : row.status === 'rejected' ? 'bg-danger' : 'bg-warning'}`}>{row.status || "pending"}</span></td>
+                <td>{row.created_at ? new Date(row.created_at).toLocaleDateString('id-ID') : "-"}</td>
                 <td className="d-flex gap-2">
                   <button type="button" className="btn btn-sm btn-success" onClick={() => updateKontakStatus(row, "approved")}>Approve</button>
-                  <button type="button" className="btn btn-sm btn-secondary" onClick={() => updateKontakStatus(row, "rejected")}>Reject</button>
+                  <button type="button" className="btn btn-sm btn-danger" onClick={() => updateKontakStatus(row, "rejected")}>Reject</button>
                 </td>
               </tr>;
             })}</tbody>
