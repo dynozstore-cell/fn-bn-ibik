@@ -36,3 +36,18 @@
     transform: rotate(360deg);
   }
 }
+
+/* Custom Dark Dropdown Items for Navbar */
+.custom-dark-item {
+  color: #ffffff !important;
+  transition: all 0.2s ease;
+}
+
+.custom-dark-item:hover, .custom-dark-item:focus {
+  background-color: rgba(168, 85, 247, 0.15) !important;
+  color: #ffffff !important;
+}
+
+.custom-dark-item.text-danger:hover, .custom-dark-item.text-danger:focus {
+  background-color: rgba(248, 113, 113, 0.15) !important;
+}

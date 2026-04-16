@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import NavbarCustom from "../components/Navbar.jsx";
 import Footer from "../components/Footer.jsx";
-import { buildApiUrl } from "../utils/api";
+import { buildApiUrl, defaultHeaders } from "../utils/api";
 
 export default function TicketOrderPage() {
   const { id } = useParams();
@@ -36,8 +36,8 @@ export default function TicketOrderPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch(buildApiUrl(`/api/event/${id}`)).then((res) => res.json()),
-      fetch(buildApiUrl("/api/metode-pembayaran")).then((res) => res.json()),
+      fetch(buildApiUrl(`/api/event/${id}`), { headers: defaultHeaders }).then((res) => res.json()),
+      fetch(buildApiUrl("/api/metode-pembayaran"), { headers: defaultHeaders }).then((res) => res.json()),
     ])
       .then(([eventData, metodeData]) => {
         setEvent(eventData);
@@ -81,10 +81,7 @@ export default function TicketOrderPage() {
       setSubmitting(true);
       const daftarResponse = await fetch(buildApiUrl("/api/daftar-event"), {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
+        headers: defaultHeaders,
         body: JSON.stringify({
           user_id: userId,
           event_id: Number(id),
