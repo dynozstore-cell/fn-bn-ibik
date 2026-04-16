@@ -18,6 +18,20 @@ const emptyMetodeForm = {
   atas_nama: "",
 };
 
+const emptyBeritaForm = {
+  judul: "",
+  kategori_id: "",
+  sumber: "",
+  ringkasan: "",
+  konten: "",
+  gambar: "",
+  tanggal: "",
+};
+
+const emptyKategoriBeritaForm = {
+  nama_kategori: "",
+};
+
 async function parseApiResponse(response) {
   const raw = await response.text();
   try {
@@ -53,6 +67,14 @@ export default function AdminEventsPage() {
 
   const [metodeList, setMetodeList] = useState([]);
   const [metodeForm, setMetodeForm] = useState(emptyMetodeForm);
+
+  const [beritaList, setBeritaList] = useState([]);
+  const [beritaForm, setBeritaForm] = useState(emptyBeritaForm);
+  const [editingBeritaId, setEditingBeritaId] = useState(null);
+
+  const [kategoriBeritaList, setKategoriBeritaList] = useState([]);
+  const [kategoriBeritaForm, setKategoriBeritaForm] = useState(emptyKategoriBeritaForm);
+  const [editingKategoriBeritaId, setEditingKategoriBeritaId] = useState(null);
 
   const authUser = useMemo(() => {
     try {
@@ -99,6 +121,18 @@ export default function AdminEventsPage() {
     setMetodeList(Array.isArray(result) ? result : result.data || []);
   };
 
+  const loadBerita = async () => {
+    const response = await fetch(buildApiUrl("/api/berita"), { headers: { Accept: "application/json" } });
+    const result = await parseApiResponse(response);
+    setBeritaList(Array.isArray(result) ? result : result.data || []);
+  };
+
+  const loadKategoriBerita = async () => {
+    const response = await fetch(buildApiUrl("/api/kategori-berita"), { headers: { Accept: "application/json" } });
+    const result = await parseApiResponse(response);
+    setKategoriBeritaList(Array.isArray(result) ? result : result.data || []);
+  };
+
   const loadCurrentTab = async () => {
     try {
       setLoading(true);
@@ -109,6 +143,16 @@ export default function AdminEventsPage() {
       if (tab === "kontak") await loadKontak();
       if (tab === "pembayaran") await loadPembayaran();
       if (tab === "metode") await loadMetode();
+      if (tab === "berita") await loadBerita();
+      if (tab === "berita") await loadKategoriBerita();
+      if (tab === "kategori-berita") await loadKategoriBerita();
+    } catch (err) {
+      setError(err.message || "Gagal memuat data.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const updatePendaftaranStatus = async (id, status) => {
     try {
       setLoading(true);
@@ -123,13 +167,6 @@ export default function AdminEventsPage() {
       await loadPendaftaran();
     } catch (err) {
       setError(err.message || "Terjadi kesalahan.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-    } catch (err) {
-      setError(err.message || "Gagal memuat data.");
     } finally {
       setLoading(false);
     }
@@ -247,6 +284,96 @@ export default function AdminEventsPage() {
     }
   };
 
+  const submitBerita = async (e) => {
+    e.preventDefault();
+    setError("");
+    setMessage("");
+    try {
+      setLoading(true);
+      const url = editingBeritaId ? buildApiUrl(`/api/berita/${editingBeritaId}`) : buildApiUrl("/api/berita");
+      const response = await fetch(url, {
+        method: editingBeritaId ? "PUT" : "POST",
+        headers: { ...authHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify(beritaForm),
+      });
+      const result = await parseApiResponse(response);
+      if (!response.ok) throw new Error(result.message || "Gagal menyimpan berita.");
+
+      setMessage(editingBeritaId ? "Berita berhasil diupdate." : "Berita berhasil ditambahkan.");
+      setBeritaForm(emptyBeritaForm);
+      setEditingBeritaId(null);
+      await loadBerita();
+    } catch (err) {
+      setError(err.message || "Terjadi kesalahan.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteBerita = async (id) => {
+    if (!window.confirm("Hapus berita ini?")) return;
+    try {
+      setLoading(true);
+      const response = await fetch(buildApiUrl(`/api/berita/${id}`), {
+        method: "DELETE",
+        headers: authHeaders,
+      });
+      const result = await parseApiResponse(response);
+      if (!response.ok) throw new Error(result.message || "Gagal hapus berita.");
+      setMessage("Berita berhasil dihapus.");
+      await loadBerita();
+    } catch (err) {
+      setError(err.message || "Terjadi kesalahan.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const submitKategoriBerita = async (e) => {
+    e.preventDefault();
+    setError("");
+    setMessage("");
+    try {
+      setLoading(true);
+      const url = editingKategoriBeritaId ? buildApiUrl(`/api/kategori-berita/${editingKategoriBeritaId}`) : buildApiUrl("/api/kategori-berita");
+      const response = await fetch(url, {
+        method: editingKategoriBeritaId ? "PUT" : "POST",
+        headers: { ...authHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify(kategoriBeritaForm),
+      });
+      const result = await parseApiResponse(response);
+      if (!response.ok) throw new Error(result.message || "Gagal menyimpan kategori.");
+
+      setMessage(editingKategoriBeritaId ? "Kategori berhasil diupdate." : "Kategori berhasil ditambahkan.");
+      setKategoriBeritaForm(emptyKategoriBeritaForm);
+      setEditingKategoriBeritaId(null);
+      await loadKategoriBerita();
+    } catch (err) {
+      setError(err.message || "Terjadi kesalahan.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteKategoriBerita = async (id) => {
+    if (!window.confirm("Hapus kategori ini? Semua berita dalam kategori ini akan terhapus.")) return;
+    try {
+      setLoading(true);
+      const response = await fetch(buildApiUrl(`/api/kategori-berita/${id}`), {
+        method: "DELETE",
+        headers: authHeaders,
+      });
+      const result = await parseApiResponse(response);
+      if (!response.ok) throw new Error(result.message || "Gagal hapus kategori.");
+      setMessage("Kategori berhasil dihapus.");
+      await loadKategoriBerita();
+    } catch (err) {
+      setError(err.message || "Terjadi kesalahan.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="container py-4">
       <div className="d-flex justify-content-between align-items-center mb-3">
@@ -262,6 +389,8 @@ export default function AdminEventsPage() {
         <button type="button" className={`btn ${tab === "kontak" ? "btn-primary" : "btn-outline-primary"}`} onClick={() => setTab("kontak")}>Kontak Event</button>
         <button type="button" className={`btn ${tab === "pembayaran" ? "btn-primary" : "btn-outline-primary"}`} onClick={() => setTab("pembayaran")}>Pembayaran</button>
         <button type="button" className={`btn ${tab === "metode" ? "btn-primary" : "btn-outline-primary"}`} onClick={() => setTab("metode")}>Metode Pembayaran</button>
+        <button type="button" className={`btn ${tab === "berita" ? "btn-primary" : "btn-outline-primary"}`} onClick={() => setTab("berita")}>Berita</button>
+        <button type="button" className={`btn ${tab === "kategori-berita" ? "btn-primary" : "btn-outline-primary"}`} onClick={() => setTab("kategori-berita")}>Kategori Berita</button>
       </div>
       {tab === "pendaftaran" ? (
         <div className="card"><div className="card-body table-responsive">
@@ -417,6 +546,131 @@ export default function AdminEventsPage() {
             <table className="table table-striped">
               <thead><tr><th>Nama Metode</th><th>Nomor Tujuan</th><th>Atas Nama</th></tr></thead>
               <tbody>{metodeList.map((row) => <tr key={row.id || row.id_metode_pembayaran}><td>{row.nama_metode}</td><td>{row.nomor_tujuan}</td><td>{row.atas_nama}</td></tr>)}</tbody>
+            </table>
+          </div></div>
+        </>
+      ) : null}
+
+      {tab === "kategori-berita" ? (
+        <>
+          <div className="card mb-4"><div className="card-body">
+            <h5>{editingKategoriBeritaId ? "Edit Kategori Berita" : "Tambah Kategori Berita"}</h5>
+            <form onSubmit={submitKategoriBerita} className="row g-3">
+              <div className="col-md-8">
+                <input 
+                  className="form-control" 
+                  placeholder="Nama Kategori (contoh: Technology, Tips & Tricks)" 
+                  value={kategoriBeritaForm.nama_kategori} 
+                  onChange={(e) => setKategoriBeritaForm((p) => ({ ...p, nama_kategori: e.target.value }))} 
+                  required 
+                />
+              </div>
+              <div className="col-md-4 d-flex gap-2">
+                <button type="submit" className="btn btn-primary">{editingKategoriBeritaId ? "Update" : "Tambah"}</button>
+                {editingKategoriBeritaId && (
+                  <button type="button" className="btn btn-secondary" onClick={() => { setEditingKategoriBeritaId(null); setKategoriBeritaForm(emptyKategoriBeritaForm); }}>Batal</button>
+                )}
+              </div>
+            </form>
+          </div></div>
+          <div className="card"><div className="card-body table-responsive">
+            <table className="table table-striped">
+              <thead><tr><th>ID</th><th>Nama Kategori</th><th>Jumlah Berita</th><th>Aksi</th></tr></thead>
+              <tbody>{kategoriBeritaList.map((row) => {
+                const id = row.id;
+                const jumlahBerita = beritaList.filter(b => b.kategori_id === id).length;
+                return <tr key={id}>
+                  <td>{id}</td>
+                  <td>{row.nama_kategori}</td>
+                  <td>{jumlahBerita}</td>
+                  <td className="d-flex gap-2">
+                    <button type="button" className="btn btn-sm btn-warning" onClick={() => { setEditingKategoriBeritaId(id); setKategoriBeritaForm({ nama_kategori: row.nama_kategori || "" }); }}>Edit</button>
+                    <button type="button" className="btn btn-sm btn-danger" onClick={() => deleteKategoriBerita(id)}>Hapus</button>
+                  </td>
+                </tr>;
+              })}</tbody>
+            </table>
+          </div></div>
+        </>
+      ) : null}
+
+      {tab === "berita" ? (
+        <>
+          <div className="card mb-4"><div className="card-body">
+            <h5>{editingBeritaId ? "Edit Berita" : "Tambah Berita"}</h5>
+            <form onSubmit={submitBerita} className="row g-3">
+              <div className="col-md-8">
+                <input className="form-control" placeholder="Judul Berita" value={beritaForm.judul} onChange={(e) => setBeritaForm((p) => ({ ...p, judul: e.target.value }))} required />
+              </div>
+              <div className="col-md-4">
+                <select
+                  className="form-select"
+                  value={beritaForm.kategori_id}
+                  onChange={(e) => setBeritaForm((p) => ({ ...p, kategori_id: e.target.value }))}
+                  required
+                >
+                  <option value="">Pilih Kategori</option>
+                  {kategoriBeritaList.map((kat) => (
+                    <option key={kat.id} value={kat.id}>{kat.nama_kategori}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="col-md-6">
+                <input className="form-control" placeholder="Link Sumber (URL)" value={beritaForm.sumber} onChange={(e) => setBeritaForm((p) => ({ ...p, sumber: e.target.value }))} required type="url" />
+              </div>
+              <div className="col-md-6">
+                <input type="date" className="form-control" value={beritaForm.tanggal} onChange={(e) => setBeritaForm((p) => ({ ...p, tanggal: e.target.value }))} required />
+              </div>
+              <div className="col-12">
+                <input className="form-control" placeholder="URL Gambar (optional)" value={beritaForm.gambar} onChange={(e) => setBeritaForm((p) => ({ ...p, gambar: e.target.value }))} />
+              </div>
+              <div className="col-12">
+                <textarea className="form-control" rows="2" placeholder="Ringkasan Berita" value={beritaForm.ringkasan} onChange={(e) => setBeritaForm((p) => ({ ...p, ringkasan: e.target.value }))} required />
+              </div>
+              <div className="col-12">
+                <textarea className="form-control" rows="5" placeholder="Konten Lengkap Berita" value={beritaForm.konten} onChange={(e) => setBeritaForm((p) => ({ ...p, konten: e.target.value }))} required />
+              </div>
+              <div className="col-12 d-flex gap-2">
+                <button type="submit" className="btn btn-primary">{editingBeritaId ? "Update" : "Tambah"}</button>
+                {editingBeritaId && (
+                  <button type="button" className="btn btn-secondary" onClick={() => { setEditingBeritaId(null); setBeritaForm(emptyBeritaForm); }}>Batal</button>
+                )}
+              </div>
+            </form>
+          </div></div>
+          <div className="card"><div className="card-body table-responsive">
+            <table className="table table-striped">
+              <thead><tr><th>ID</th><th>Judul</th><th>Kategori</th><th>Tanggal</th><th>Sumber</th><th>Aksi</th></tr></thead>
+              <tbody>{beritaList.map((row) => {
+                const id = row.id;
+                const kategoriNama = row.kategori ? row.kategori.nama_kategori : "-";
+                return <tr key={id}>
+                  <td>{id}</td>
+                  <td style={{maxWidth: '300px'}}>{row.judul}</td>
+                  <td><span className="badge bg-info">{kategoriNama}</span></td>
+                  <td>{row.tanggal ? new Date(row.tanggal).toLocaleDateString('id-ID') : "-"}</td>
+                  <td>
+                    {row.sumber ? (
+                      <a href={row.sumber} target="_blank" rel="noreferrer" className="btn btn-sm btn-outline-primary">Lihat</a>
+                    ) : "-"}
+                  </td>
+                  <td className="d-flex gap-2">
+                    <button type="button" className="btn btn-sm btn-warning" onClick={() => { 
+                      setEditingBeritaId(id); 
+                      setBeritaForm({ 
+                        judul: row.judul || "", 
+                        kategori_id: String(row.kategori_id || ""), 
+                        sumber: row.sumber || "", 
+                        ringkasan: row.ringkasan || "", 
+                        konten: row.konten || "", 
+                        gambar: row.gambar || "", 
+                        tanggal: row.tanggal ? row.tanggal.split('T')[0] : "" 
+                      }); 
+                    }}>Edit</button>
+                    <button type="button" className="btn btn-sm btn-danger" onClick={() => deleteBerita(id)}>Hapus</button>
+                  </td>
+                </tr>;
+              })}</tbody>
             </table>
           </div></div>
         </>

@@ -9,6 +9,8 @@ use App\Http\Controllers\KontakEventController;
 use App\Http\Controllers\PembayaranController;
 use App\Http\Controllers\MetodePembayaranController;
 use App\Http\Controllers\KategoriController;
+use App\Http\Controllers\BeritaController;
+use App\Http\Controllers\KategoriBeritaController;
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -54,3 +56,20 @@ Route::post('/metode-pembayaran', [MetodePembayaranController::class, 'store']);
 Route::get('/metode-pembayaran/{id}', [MetodePembayaranController::class, 'show']);
 
 Route::get('/kategori', [KategoriController::class, 'index']);
+
+// Routes untuk Berita
+Route::get('/berita', [BeritaController::class, 'index']);
+Route::get('/berita/{id}', [BeritaController::class, 'show']);
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/berita', [BeritaController::class, 'store']);
+    Route::put('/berita/{id}', [BeritaController::class, 'update']);
+    Route::delete('/berita/{id}', [BeritaController::class, 'destroy']);
+});
+
+// Routes untuk Kategori Berita
+Route::get('/kategori-berita', [KategoriBeritaController::class, 'index']);
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/kategori-berita', [KategoriBeritaController::class, 'store']);
+    Route::put('/kategori-berita/{id}', [KategoriBeritaController::class, 'update']);
+    Route::delete('/kategori-berita/{id}', [KategoriBeritaController::class, 'destroy']);
+});

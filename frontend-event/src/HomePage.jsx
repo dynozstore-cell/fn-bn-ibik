@@ -397,6 +397,34 @@ const NEWS_DATA = [
   },
 ];
 
+const GRADIENT_COLORS = [
+  "linear-gradient(135deg, #667eea, #764ba2)",
+  "linear-gradient(135deg, #f093fb, #f5576c)",
+  "linear-gradient(135deg, #4facfe, #00f2fe)",
+  "linear-gradient(135deg, #fa709a, #fee140)",
+  "linear-gradient(135deg, #a8edea, #fed6e3)",
+  "linear-gradient(135deg, #ff9a56, #ff6a91)",
+  "linear-gradient(135deg, #06b6d4, #6366f1)",
+  "linear-gradient(135deg, #22c55e, #a3e635)",
+];
+
+/** Transform berita dari API ke format NEWS_DATA */
+function transformBeritaToNews(beritaList) {
+  if (!beritaList || beritaList.length === 0) return NEWS_DATA;
+  
+  return beritaList.map((berita, index) => ({
+    id: `berita-${berita.id}`,
+    title: berita.judul || "Berita",
+    date: berita.tanggal ? new Date(berita.tanggal).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : "-",
+    category: berita.kategori?.nama_kategori || "General",
+    source: berita.sumber || "EventPlace",
+    excerpt: berita.ringkasan || "",
+    content: berita.konten || "",
+    image: berita.gambar || GRADIENT_COLORS[index % GRADIENT_COLORS.length],
+    link: berita.sumber || null,
+  }));
+}
+
 export default function HomePage() {
   const navigate = useNavigate();
   const [events, setEvents] = useState([]);
@@ -424,12 +452,17 @@ export default function HomePage() {
   const isNewsDraggingRef = useRef(false);
   const newsStartXRef = useRef(0);
   const newsScrollLeftRef = useRef(0);
+  const [beritaList, setBeritaList] = useState([]);
 
   const latestList = useMemo(() => {
     const list = latestEvents.length ? latestEvents : events;
     const normalized = Array.isArray(list) ? list : [];
     return normalized.length ? normalized : DEMO_LATEST_EVENTS;
   }, [events, latestEvents]);
+
+  const newsData = useMemo(() => {
+    return transformBeritaToNews(beritaList);
+  }, [beritaList]);
 
   // 3x loop untuk infinite scroll (6 card asli x 3 = 18 card)
   const latestLoopList = useMemo(() => {
@@ -509,6 +542,15 @@ export default function HomePage() {
         const mapped = list.map(normalizeEvent);
         setEvents(mapped);
         setLatestEvents(mapped);
+      })
+      .catch(() => {});
+
+    // Fetch berita dari API
+    fetch(buildApiUrl("/api/berita"))
+      .then((res) => res.json())
+      .then((data) => {
+        const list = Array.isArray(data) ? data : [];
+        setBeritaList(list);
       })
       .catch(() => {});
   }, []);
@@ -1285,7 +1327,7 @@ export default function HomePage() {
                 newsCarouselRef.current.scrollLeft = newsScrollLeftRef.current + walk;
               }}
             >
-              {NEWS_DATA.map((news, idx) => (
+              {newsData.map((news, idx) => (
                 <article
                   key={news.id}
                   className={`news-preview-card ${idx === selectedNewsIdx ? "news-preview-card--active" : ""}`}
@@ -1296,7 +1338,15 @@ export default function HomePage() {
                 >
                   <div
                     className="news-preview-image"
-                    style={{ background: news.image }}
+                    style={
+                      news.image && (news.image.startsWith('http://') || news.image.startsWith('https://'))
+                        ? {
+                            backgroundImage: `url(${news.image})`,
+                            backgroundSize: 'cover',
+                            backgroundPosition: 'center',
+                          }
+                        : { background: news.image }
+                    }
                   />
                   <div className="news-preview-info">
                     <h4 className="news-preview-title">{news.title}</h4>
@@ -1324,16 +1374,37 @@ export default function HomePage() {
               </button>
               <div
                 className="news-detail-image"
-                style={{ background: NEWS_DATA[selectedNewsIdx].image }}
+                style={
+                  newsData[selectedNewsIdx]?.image && 
+                  (newsData[selectedNewsIdx].image.startsWith('http://') || newsData[selectedNewsIdx].image.startsWith('https://'))
+                    ? {
+                        backgroundImage: `url(${newsData[selectedNewsIdx].image})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                      }
+                    : { background: newsData[selectedNewsIdx]?.image }
+                }
               />
               <div className="news-detail-content">
-                <span className="news-detail-category">{NEWS_DATA[selectedNewsIdx].category}</span>
-                <h2 className="news-detail-title">{NEWS_DATA[selectedNewsIdx].title}</h2>
+                <span className="news-detail-category">{newsData[selectedNewsIdx]?.category}</span>
+                <h2 className="news-detail-title">{newsData[selectedNewsIdx]?.title}</h2>
                 <div className="news-detail-meta">
-                  <span className="news-detail-source">{NEWS_DATA[selectedNewsIdx].source}</span>
-                  <span className="news-detail-date">{NEWS_DATA[selectedNewsIdx].date}</span>
+                  <span className="news-detail-source">{newsData[selectedNewsIdx]?.source}</span>
+                  <span className="news-detail-date">{newsData[selectedNewsIdx]?.date}</span>
                 </div>
-                <article className="news-detail-text">{NEWS_DATA[selectedNewsIdx].content}</article>
+                <article className="news-detail-text">{newsData[selectedNewsIdx]?.content}</article>
+                {newsData[selectedNewsIdx]?.link && (
+                  <div className="mt-3">
+                    <a 
+                      href={newsData[selectedNewsIdx].link} 
+                      target="_blank" 
+                      rel="noreferrer"
+                      className="btn btn-sm btn-outline-primary"
+                    >
+                      Baca Selengkapnya di Sumber →
+                    </a>
+                  </div>
+                )}
               </div>
             </div>
           </div>
