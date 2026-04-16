@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import NavbarCustom from "../components/Navbar.jsx";
 import Footer from "../components/Footer.jsx";
-import { buildApiUrl } from "../utils/api";
+import { buildApiUrl, defaultHeaders } from "../utils/api";
 
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1505373876077-705f7919a43b?w=1200&q=80";
 
@@ -15,7 +15,9 @@ export default function EventDetailPage() {
   useEffect(() => {
     setLoading(true);
     setError("");
-    fetch(buildApiUrl(`/api/event/${id}`))
+    fetch(buildApiUrl(`/api/event/${id}`), {
+      headers: defaultHeaders
+    })
       .then((res) => res.json())
       .then((data) => {
         setEvent(data);

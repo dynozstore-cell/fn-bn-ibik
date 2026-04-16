@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import "./HomePage.css";
 import "./styles/Footer.css";
 import NavbarCustom from "./components/Navbar.jsx";
-import { buildApiUrl } from "./utils/api";
+import { buildApiUrl, defaultHeaders } from "./utils/api";
 
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1505373876077-705f7919a43b?w=1200&q=80";
 
@@ -502,7 +502,9 @@ export default function HomePage() {
   const heroCards = useMemo(() => buildHeroCardsFromEvents(events), [events]);
 
   useEffect(() => {
-    fetch(buildApiUrl("/api/event"))
+    fetch(buildApiUrl("/api/event"), {
+      headers: defaultHeaders
+    })
       .then((res) => res.json())
       .then((data) => {
         const list = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
@@ -1312,28 +1314,58 @@ export default function HomePage() {
 
         {/* News Detail Modal */}
         {showNewsDetail && (
-          <div className="news-detail-overlay" onClick={() => setShowNewsDetail(false)}>
-            <div className="news-detail-modal" onClick={(e) => e.stopPropagation()}>
+          <div 
+            className="news-detail-overlay" 
+            onClick={() => setShowNewsDetail(false)}
+            style={{ zIndex: 10000 }}
+          >
+            <div 
+              className="news-detail-modal" 
+              onClick={(e) => e.stopPropagation()}
+              style={{ 
+                display: 'flex', 
+                flexDirection: 'row', 
+                maxWidth: '90vw', 
+                maxHeight: '90vh',
+                width: '800px',
+                height: '500px'
+              }}
+            >
               <button
                 type="button"
                 className="news-detail-close"
                 onClick={() => setShowNewsDetail(false)}
                 aria-label="Close"
+                style={{ position: 'absolute', top: '10px', right: '10px', zIndex: 10001 }}
               >
                 ✕
               </button>
               <div
                 className="news-detail-image"
-                style={{ background: NEWS_DATA[selectedNewsIdx].image }}
+                style={{ 
+                  background: NEWS_DATA[selectedNewsIdx].image,
+                  flex: 1,
+                  height: '100%',
+                  borderRadius: '10px 0 0 10px'
+                }}
               />
-              <div className="news-detail-content">
+              <div 
+                className="news-detail-content"
+                style={{ 
+                  flex: 1, 
+                  padding: '20px', 
+                  overflowY: 'auto',
+                  display: 'flex',
+                  flexDirection: 'column'
+                }}
+              >
                 <span className="news-detail-category">{NEWS_DATA[selectedNewsIdx].category}</span>
                 <h2 className="news-detail-title">{NEWS_DATA[selectedNewsIdx].title}</h2>
                 <div className="news-detail-meta">
                   <span className="news-detail-source">{NEWS_DATA[selectedNewsIdx].source}</span>
                   <span className="news-detail-date">{NEWS_DATA[selectedNewsIdx].date}</span>
                 </div>
-                <article className="news-detail-text">{NEWS_DATA[selectedNewsIdx].content}</article>
+                <article className="news-detail-text" style={{ flex: 1 }}>{NEWS_DATA[selectedNewsIdx].content}</article>
               </div>
             </div>
           </div>

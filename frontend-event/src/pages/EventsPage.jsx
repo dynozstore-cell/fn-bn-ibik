@@ -5,7 +5,7 @@ import Footer from "../components/Footer.jsx";
 import "../styles/EventsPage.css";
 import "../styles/Footer.css";
 import { Search } from "lucide-react";
-import { buildApiUrl } from "../utils/api";
+import { buildApiUrl, defaultHeaders } from "../utils/api";
 
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1505373876077-705f7919a43b?w=1200&q=80";
 
@@ -46,7 +46,9 @@ const EventsPage = () => {
   // Fetch semua events
   useEffect(() => {
     setLoading(true);
-    fetch(buildApiUrl("/api/event"))
+    fetch(buildApiUrl("/api/event"), {
+      headers: defaultHeaders
+    })
       .then((res) => res.json())
       .then((data) => {
         const eventList = (Array.isArray(data) ? data : []).map(normalizeEvent);

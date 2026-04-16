@@ -347,7 +347,7 @@
 .events-card-header {
   position: relative;
   overflow: hidden;
-  height: 200px;
+  aspect-ratio: 1;
 }
 
 .events-card-image {

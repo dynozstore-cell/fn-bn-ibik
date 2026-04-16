@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import NavbarCustom from "../components/Navbar.jsx";
 import Footer from "../components/Footer.jsx";
-import { buildApiUrl } from "../utils/api";
+import { buildApiUrl, defaultHeaders } from "../utils/api";
 
 const initialRegisterForm = {
   nama_lengkap: "",
@@ -57,10 +57,7 @@ export default function AuthPage() {
     try {
       const response = await fetch(buildApiUrl("/api/register"), {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
+        headers: defaultHeaders,
         body: JSON.stringify(registerForm),
       });
 
@@ -89,10 +86,7 @@ export default function AuthPage() {
     try {
       const response = await fetch(buildApiUrl("/api/login"), {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
+        headers: defaultHeaders,
         body: JSON.stringify(loginForm),
       });
 

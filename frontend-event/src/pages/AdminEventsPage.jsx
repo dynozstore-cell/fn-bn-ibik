@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { buildApiUrl } from "../utils/api";
+import { buildApiUrl, defaultHeaders } from "../utils/api";
+import { getUser, getToken } from "../utils/auth";
 
 const emptyEventForm = {
   nama_event: "",
@@ -46,7 +47,7 @@ export default function AdminEventsPage() {
   const [pendaftaranList, setPendaftaranList] = useState([]);
   const [pembayaranList, setPembayaranList] = useState([]);
   const loadPendaftaran = async () => {
-    const response = await fetch(buildApiUrl("/api/daftar-event"), { headers: { Accept: "application/json" } });
+    const response = await fetch(buildApiUrl("/api/daftar-event"), { headers: authJsonHeaders });
     const result = await parseApiResponse(response);
     setPendaftaranList(Array.isArray(result) ? result : result.data || []);
   };
@@ -54,47 +55,42 @@ export default function AdminEventsPage() {
   const [metodeList, setMetodeList] = useState([]);
   const [metodeForm, setMetodeForm] = useState(emptyMetodeForm);
 
-  const authUser = useMemo(() => {
-    try {
-      return JSON.parse(localStorage.getItem("auth_user") || "{}");
-    } catch {
-      return {};
-    }
-  }, []);
+  const authUser = useMemo(() => getUser() || {}, []);
 
-  const token = localStorage.getItem("auth_token") || "";
-  const authHeaders = { Accept: "application/json", Authorization: `Bearer ${token}` };
+  const token = getToken() || "";
+  const authJsonHeaders = { ...defaultHeaders, Authorization: `Bearer ${token}` };
+  const authMultipartHeaders = { "Accept": "application/json", Authorization: `Bearer ${token}` };
 
   useEffect(() => {
     if (authUser?.role !== "admin") navigate("/auth");
   }, [authUser, navigate]);
 
   const loadEvents = async () => {
-    const response = await fetch(buildApiUrl("/api/event"), { headers: { Accept: "application/json" } });
+    const response = await fetch(buildApiUrl("/api/event"), { headers: authJsonHeaders });
     const result = await parseApiResponse(response);
     setEvents(Array.isArray(result) ? result : result.data || []);
   };
 
   const loadKategori = async () => {
-    const response = await fetch(buildApiUrl("/api/kategori"), { headers: { Accept: "application/json" } });
+    const response = await fetch(buildApiUrl("/api/kategori"), { headers: authJsonHeaders });
     const result = await parseApiResponse(response);
     setKategoriList(Array.isArray(result) ? result : result.data || []);
   };
 
   const loadKontak = async () => {
-    const response = await fetch(buildApiUrl("/api/kontak-event"), { headers: { Accept: "application/json" } });
+    const response = await fetch(buildApiUrl("/api/kontak-event"), { headers: authJsonHeaders });
     const result = await parseApiResponse(response);
     setKontakList(Array.isArray(result) ? result : result.data || []);
   };
 
   const loadPembayaran = async () => {
-    const response = await fetch(buildApiUrl("/api/pembayaran"), { headers: { Accept: "application/json" } });
+    const response = await fetch(buildApiUrl("/api/pembayaran"), { headers: authJsonHeaders });
     const result = await parseApiResponse(response);
     setPembayaranList(Array.isArray(result) ? result : result.data || []);
   };
 
   const loadMetode = async () => {
-    const response = await fetch(buildApiUrl("/api/metode-pembayaran"), { headers: { Accept: "application/json" } });
+    const response = await fetch(buildApiUrl("/api/metode-pembayaran"), { headers: authJsonHeaders });
     const result = await parseApiResponse(response);
     setMetodeList(Array.isArray(result) ? result : result.data || []);
   };
@@ -114,7 +110,7 @@ export default function AdminEventsPage() {
       setLoading(true);
       const response = await fetch(buildApiUrl(`/api/daftar-event/${id}`), {
         method: "PUT",
-        headers: { ...authHeaders, "Content-Type": "application/json" },
+        headers: authJsonHeaders,
         body: JSON.stringify({ status_pendaftaran: status }),
       });
       const result = await parseApiResponse(response);
@@ -156,7 +152,7 @@ export default function AdminEventsPage() {
       if (eventForm.foto_event) payload.append("foto_event", eventForm.foto_event);
       if (editingEventId) payload.append("_method", "PUT");
 
-      const response = await fetch(url, { method: "POST", headers: authHeaders, body: payload });
+      const response = await fetch(url, { method: "POST", headers: authMultipartHeaders, body: payload });
       const result = await parseApiResponse(response);
       if (!response.ok) throw new Error(result.message || "Gagal menyimpan event.");
 
@@ -175,7 +171,7 @@ export default function AdminEventsPage() {
     if (!window.confirm("Hapus event ini?")) return;
     try {
       setLoading(true);
-      const response = await fetch(buildApiUrl(`/api/event/${id}`), { method: "DELETE", headers: authHeaders });
+      const response = await fetch(buildApiUrl(`/api/event/${id}`), { method: "DELETE", headers: authJsonHeaders });
       const result = await parseApiResponse(response);
       if (!response.ok) throw new Error(result.message || "Gagal hapus event.");
       setMessage("Event berhasil dihapus.");
@@ -193,7 +189,7 @@ export default function AdminEventsPage() {
       const id = row.id || row.id_kontak_event;
       const response = await fetch(buildApiUrl(`/api/kontak-event/${id}`), {
         method: "PUT",
-        headers: { ...authHeaders, "Content-Type": "application/json" },
+        headers: authJsonHeaders,
         body: JSON.stringify({ ...row, status }),
       });
       const result = await parseApiResponse(response);
@@ -212,7 +208,7 @@ export default function AdminEventsPage() {
       setLoading(true);
       const response = await fetch(buildApiUrl(`/api/pembayaran/${id}/verifikasi`), {
         method: "PUT",
-        headers: { ...authHeaders, "Content-Type": "application/json" },
+        headers: authJsonHeaders,
         body: JSON.stringify({ status_pembayaran: status }),
       });
       const result = await parseApiResponse(response);
@@ -232,7 +228,7 @@ export default function AdminEventsPage() {
       setLoading(true);
       const response = await fetch(buildApiUrl("/api/metode-pembayaran"), {
         method: "POST",
-        headers: { ...authHeaders, "Content-Type": "application/json" },
+        headers: authJsonHeaders,
         body: JSON.stringify(metodeForm),
       });
       const result = await parseApiResponse(response);
