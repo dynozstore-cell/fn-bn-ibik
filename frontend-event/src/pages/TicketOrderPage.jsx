@@ -154,7 +154,7 @@ export default function TicketOrderPage() {
 
               {!userId ? (
                 <div className="alert alert-warning">
-                  Anda belum login. <Link to="/auth">Login di sini</Link> untuk lanjut pembelian.
+                  Anda belum login. <Link to="/login">Login di sini</Link> untuk lanjut pembelian.
                 </div>
               ) : (
                 <p className="text-muted">Pesanan akan dibuat atas nama: {displayName}</p>

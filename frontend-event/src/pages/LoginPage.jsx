@@ -50,7 +50,13 @@ const LoginPage = () => {
         setAuth(data.token, data.data);
         setSuccess('Login berhasil! Mengalihkan...');
         setIsVisible(false);
-        setTimeout(() => navigate('/'), 600);
+        setTimeout(() => {
+          if (data.data?.role === 'admin') {
+            navigate('/admin/dashboard');
+          } else {
+            navigate('/');
+          }
+        }, 600);
       } else if (response.status === 403 && data.error_code === 'email_not_verified') {
         // Email belum diverifikasi → arahkan ke OTP verify
         setError(data.message || 'Email belum diverifikasi.');
@@ -98,14 +104,14 @@ const LoginPage = () => {
 
         <form className="login-form" onSubmit={handleSubmit}>
           <div className="form-group">
-            <label htmlFor="email">Email</label>
+            <label htmlFor="email">Email / Username</label>
             <input
               id="email"
-              type="email"
+              type="text"
               name="email"
               value={formData.email}
               onChange={handleChange}
-              placeholder="Masukkan email Anda"
+              placeholder="Masukkan email atau username"
               className="form-input"
               required
             />

@@ -1,221 +1,159 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { buildApiUrl } from "../utils/api";
+import {
+  Calendar, Trash2, Search, Filter, ChevronLeft, ChevronRight,
+  BarChart2, PieChart as PieIcon, Activity, TrendingUp,
+  Tag, Users2, AlertCircle, CheckCircle2, Clock, Download
+} from "lucide-react";
+import {
+  BarChart, Bar, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
+} from "recharts";
+import { buildApiUrl, defaultHeaders } from "../utils/api";
+import { getToken } from "../utils/auth";
+import "../styles/AdminEventsPage.css";
 
-const emptyEventForm = {
-  nama_event: "",
-  kategori_id: "",
-  deskripsi: "",
-  tanggal: "",
-  lokasi: "",
-  harga: "",
-  foto_event: null,
-};
+/* ─── Constants ─────────────────────────────────────────── */
+const PIE_COLORS = ["#7c3aed", "#0ea5e9", "#10b981", "#f59e0b", "#f43f5e", "#8b5cf6"];
+const PER_PAGE_OPTIONS = [10, 50, 100, "Semua"];
 
-const emptyMetodeForm = {
-  nama_metode: "",
-  nomor_tujuan: "",
-  atas_nama: "",
-};
-
-const emptyBeritaForm = {
-  judul: "",
-  kategori_id: "",
-  sumber: "",
-  ringkasan: "",
-  konten: "",
-  gambar: "",
-  tanggal: "",
-};
-
-const emptyKategoriBeritaForm = {
-  nama_kategori: "",
-};
-
-async function parseApiResponse(response) {
-  const raw = await response.text();
-  try {
-    return JSON.parse(raw);
-  } catch {
-    if (raw.startsWith("<!DOCTYPE") || raw.startsWith("<html")) {
-      throw new Error("Server mengembalikan HTML, bukan JSON.");
-    }
-    throw new Error("Response server tidak valid.");
-  }
+/* ─── Helpers ───────────────────────────────────────────── */
+async function parseApiResponse(res) {
+  const raw = await res.text();
+  try { return JSON.parse(raw); } catch { throw new Error("Response tidak valid"); }
 }
 
+function formatDate(str) {
+  if (!str) return "-";
+  const d = new Date(str);
+  return isNaN(d) ? str : d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function getStatusBadge(tanggal) {
+  if (!tanggal) return { label: "Tidak diketahui", cls: "aep-badge-unknown" };
+  const now = new Date();
+  const date = new Date(tanggal);
+  if (date > now) return { label: "Akan Datang", cls: "aep-badge-upcoming" };
+  return { label: "Selesai", cls: "aep-badge-done" };
+}
+
+/* ─── Sub-components ────────────────────────────────────── */
+function ChartTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="aep-tooltip">
+      <p className="aep-tooltip-label">{label}</p>
+      {payload.map((p, i) => (
+        <p key={i} style={{ color: p.color, margin: "3px 0 0", fontWeight: 600, fontSize: "0.875rem" }}>
+          {p.name}: {p.value}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+function PieLabel({ cx, cy, midAngle, innerRadius, outerRadius, percent }) {
+  const R = Math.PI / 180;
+  const r = innerRadius + (outerRadius - innerRadius) * 0.5;
+  const x = cx + r * Math.cos(-midAngle * R);
+  const y = cy + r * Math.sin(-midAngle * R);
+  if (percent < 0.06) return null;
+  return (
+    <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={12} fontWeight={700}>
+      {(percent * 100).toFixed(0)}%
+    </text>
+  );
+}
+
+function StatCard({ icon, label, value, gradient, glow }) {
+  return (
+    <div className="aep-stat-card" style={{ "--glow": glow }}>
+      <div className="aep-stat-icon" style={{ background: gradient }}>{icon}</div>
+      <div className="aep-stat-body">
+        <span className="aep-stat-label">{label}</span>
+        <span className="aep-stat-value">{value}</span>
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   MAIN COMPONENT
+════════════════════════════════════════════════════════ */
 export default function AdminEventsPage() {
   const navigate = useNavigate();
-  const [tab, setTab] = useState("event");
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+  const token = getToken() || "";
+  const authJson = { ...defaultHeaders, Authorization: `Bearer ${token}` };
+  const authMulti = { Accept: "application/json", Authorization: `Bearer ${token}` };
 
+  /* ── State ───────────────────────────────────────────── */
   const [events, setEvents] = useState([]);
   const [kategoriList, setKategoriList] = useState([]);
-  const [eventForm, setEventForm] = useState(emptyEventForm);
-  const [editingEventId, setEditingEventId] = useState(null);
+  const [penyelenggaraList, setPenyelenggaraList] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
 
-  const [kontakList, setKontakList] = useState([]);
-  const [pendaftaranList, setPendaftaranList] = useState([]);
-  const [pembayaranList, setPembayaranList] = useState([]);
-  const loadPendaftaran = async () => {
-    const response = await fetch(buildApiUrl("/api/daftar-event"), { headers: { Accept: "application/json" } });
-    const result = await parseApiResponse(response);
-    setPendaftaranList(Array.isArray(result) ? result : result.data || []);
-  };
+  // Filters & pagination
+  const [search, setSearch] = useState("");
+  const [filterKat, setFilterKat] = useState("");
+  const [filterOrg, setFilterOrg] = useState("");
+  const [perPage, setPerPage] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
 
-  const [metodeList, setMetodeList] = useState([]);
-  const [metodeForm, setMetodeForm] = useState(emptyMetodeForm);
+  // Delete confirmation
+  const [deleteId, setDeleteId] = useState(null);
 
-  const [beritaList, setBeritaList] = useState([]);
-  const [beritaForm, setBeritaForm] = useState(emptyBeritaForm);
-  const [editingBeritaId, setEditingBeritaId] = useState(null);
-
-  const [kategoriBeritaList, setKategoriBeritaList] = useState([]);
-  const [kategoriBeritaForm, setKategoriBeritaForm] = useState(emptyKategoriBeritaForm);
-  const [editingKategoriBeritaId, setEditingKategoriBeritaId] = useState(null);
-
-  const authUser = useMemo(() => {
-    try {
-      return JSON.parse(localStorage.getItem("auth_user") || "{}");
-    } catch {
-      return {};
-    }
-  }, []);
-
-  const token = localStorage.getItem("auth_token") || "";
-  const authHeaders = { Accept: "application/json", Authorization: `Bearer ${token}` };
-
-  useEffect(() => {
-    if (authUser?.role !== "admin") navigate("/auth");
-  }, [authUser, navigate]);
-
+  /* ── Data loading ────────────────────────────────────── */
   const loadEvents = async () => {
-    const response = await fetch(buildApiUrl("/api/event"), { headers: { Accept: "application/json" } });
-    const result = await parseApiResponse(response);
-    setEvents(Array.isArray(result) ? result : result.data || []);
+    const res = await fetch(buildApiUrl("/api/event"), { headers: authJson });
+    const result = await parseApiResponse(res);
+    const list = Array.isArray(result) ? result : result.data || [];
+    setEvents(list);
+
+    // Extract unique penyelenggara (organizers)
+    const orgs = [...new Set(list.map(e => e.penyelenggara || e.nama_penyelenggara).filter(Boolean))];
+    setPenyelenggaraList(orgs);
   };
 
   const loadKategori = async () => {
-    const response = await fetch(buildApiUrl("/api/kategori"), { headers: { Accept: "application/json" } });
-    const result = await parseApiResponse(response);
+    const res = await fetch(buildApiUrl("/api/kategori"), { headers: authJson });
+    const result = await parseApiResponse(res);
     setKategoriList(Array.isArray(result) ? result : result.data || []);
   };
 
-  const loadKontak = async () => {
-    const response = await fetch(buildApiUrl("/api/kontak-event"), { headers: { Accept: "application/json" } });
-    const result = await parseApiResponse(response);
-    setKontakList(Array.isArray(result) ? result : result.data || []);
-  };
-
-  const loadPembayaran = async () => {
-    const response = await fetch(buildApiUrl("/api/pembayaran"), { headers: { Accept: "application/json" } });
-    const result = await parseApiResponse(response);
-    setPembayaranList(Array.isArray(result) ? result : result.data || []);
-  };
-
-  const loadMetode = async () => {
-    const response = await fetch(buildApiUrl("/api/metode-pembayaran"), { headers: { Accept: "application/json" } });
-    const result = await parseApiResponse(response);
-    setMetodeList(Array.isArray(result) ? result : result.data || []);
-  };
-
-  const loadBerita = async () => {
-    const response = await fetch(buildApiUrl("/api/berita"), { headers: { Accept: "application/json" } });
-    const result = await parseApiResponse(response);
-    setBeritaList(Array.isArray(result) ? result : result.data || []);
-  };
-
-  const loadKategoriBerita = async () => {
-    const response = await fetch(buildApiUrl("/api/kategori-berita"), { headers: { Accept: "application/json" } });
-    const result = await parseApiResponse(response);
-    setKategoriBeritaList(Array.isArray(result) ? result : result.data || []);
-  };
-
-  const loadCurrentTab = async () => {
-    try {
+  useEffect(() => {
+    (async () => {
       setLoading(true);
       setError("");
-      if (tab === "event") await loadEvents();
-      if (tab === "event") await loadKategori();
-      if (tab === "pendaftaran") await loadPendaftaran();
-      if (tab === "kontak") await loadKontak();
-      if (tab === "pembayaran") await loadPembayaran();
-      if (tab === "metode") await loadMetode();
-      if (tab === "berita") await loadBerita();
-      if (tab === "berita") await loadKategoriBerita();
-      if (tab === "kategori-berita") await loadKategoriBerita();
-    } catch (err) {
-      setError(err.message || "Gagal memuat data.");
-    } finally {
-      setLoading(false);
-    }
-  };
+      try {
+        await Promise.all([loadEvents(), loadKategori()]);
+      } catch (err) {
+        setError(err.message || "Gagal memuat data.");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
-  const updatePendaftaranStatus = async (id, status) => {
-    try {
-      setLoading(true);
-      const response = await fetch(buildApiUrl(`/api/daftar-event/${id}`), {
-        method: "PUT",
-        headers: { ...authHeaders, "Content-Type": "application/json" },
-        body: JSON.stringify({ status_pendaftaran: status }),
-      });
-      const result = await parseApiResponse(response);
-      if (!response.ok) throw new Error(result.message || "Gagal update pendaftaran.");
-      setMessage("Status pendaftaran berhasil diperbarui.");
-      await loadPendaftaran();
-    } catch (err) {
-      setError(err.message || "Terjadi kesalahan.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  /* ── Delete ──────────────────────────────────────────── */
+  const confirmDelete = (id) => setDeleteId(id);
+  const cancelDelete = () => setDeleteId(null);
 
-  useEffect(() => {
-    loadCurrentTab();
-  }, [tab]);
-
-  const submitEvent = async (e) => {
-    e.preventDefault();
+  const doDelete = async () => {
+    if (!deleteId) return;
+    setLoading(true);
     setError("");
     setMessage("");
     try {
-      setLoading(true);
-      const url = editingEventId ? buildApiUrl(`/api/event/${editingEventId}`) : buildApiUrl("/api/event");
-      const payload = new FormData();
-      payload.append("nama_event", eventForm.nama_event);
-      payload.append("kategori_id", eventForm.kategori_id);
-      payload.append("deskripsi", eventForm.deskripsi);
-      payload.append("tanggal", eventForm.tanggal);
-      payload.append("lokasi", eventForm.lokasi);
-      payload.append("harga", eventForm.harga || 0);
-      if (eventForm.foto_event) payload.append("foto_event", eventForm.foto_event);
-      if (editingEventId) payload.append("_method", "PUT");
-
-      const response = await fetch(url, { method: "POST", headers: authHeaders, body: payload });
-      const result = await parseApiResponse(response);
-      if (!response.ok) throw new Error(result.message || "Gagal menyimpan event.");
-
-      setMessage(editingEventId ? "Event berhasil diperbarui." : "Event berhasil ditambahkan.");
-      setEventForm(emptyEventForm);
-      setEditingEventId(null);
-      await loadEvents();
-    } catch (err) {
-      setError(err.message || "Terjadi kesalahan.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const deleteEvent = async (id) => {
-    if (!window.confirm("Hapus event ini?")) return;
-    try {
-      setLoading(true);
-      const response = await fetch(buildApiUrl(`/api/event/${id}`), { method: "DELETE", headers: authHeaders });
-      const result = await parseApiResponse(response);
-      if (!response.ok) throw new Error(result.message || "Gagal hapus event.");
+      const res = await fetch(buildApiUrl(`/api/event/${deleteId}`), {
+        method: "DELETE",
+        headers: authJson,
+      });
+      const result = await parseApiResponse(res);
+      if (!res.ok) throw new Error(result.message || "Gagal menghapus event.");
       setMessage("Event berhasil dihapus.");
+      setDeleteId(null);
       await loadEvents();
     } catch (err) {
       setError(err.message || "Terjadi kesalahan.");
@@ -224,458 +162,454 @@ export default function AdminEventsPage() {
     }
   };
 
-  const updateKontakStatus = async (row, status) => {
-    try {
-      setLoading(true);
-      const id = row.id || row.id_kontak_event;
-      const response = await fetch(buildApiUrl(`/api/kontak-event/${id}`), {
-        method: "PUT",
-        headers: { ...authHeaders, "Content-Type": "application/json" },
-        body: JSON.stringify({ ...row, status }),
-      });
-      const result = await parseApiResponse(response);
-      if (!response.ok) throw new Error(result.message || "Gagal update status.");
-      setMessage("Status kontak berhasil diperbarui.");
-      await loadKontak();
-    } catch (err) {
-      setError(err.message || "Terjadi kesalahan.");
-    } finally {
-      setLoading(false);
-    }
+  /* ── Export CSV ──────────────────────────────────────── */
+  const exportToCSV = () => {
+    if (events.length === 0) return;
+    const rows = [
+      ["ID", "Nama Event", "Kategori", "Penyelenggara", "Tanggal", "Lokasi", "Harga", "Status"],
+    ];
+    
+    events.forEach(ev => {
+      const id = ev.id || ev.id_event || "";
+      const nama = ev.nama_event || "";
+      const kat = ev.nama_kategori || ev.category || "";
+      const org = ev.penyelenggara || ev.nama_penyelenggara || "";
+      const tgl = ev.tanggal || "";
+      const lok = ev.lokasi || "";
+      const hrg = ev.harga || "0";
+      const status = getStatusBadge(tgl).label;
+      
+      // Escape commas and quotes for CSV
+      rows.push([
+        id, 
+        `"${nama.replace(/"/g, '""')}"`, 
+        `"${kat}"`, 
+        `"${org}"`, 
+        `"${tgl}"`, 
+        `"${lok.replace(/"/g, '""')}"`, 
+        hrg, 
+        `"${status}"`
+      ]);
+    });
+
+    const csvContent = "data:text/csv;charset=utf-8," + rows.map(r => r.join(",")).join("\r\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "data_event.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
-  const updatePembayaranStatus = async (id, status) => {
-    try {
-      setLoading(true);
-      const response = await fetch(buildApiUrl(`/api/pembayaran/${id}/verifikasi`), {
-        method: "PUT",
-        headers: { ...authHeaders, "Content-Type": "application/json" },
-        body: JSON.stringify({ status_pembayaran: status }),
-      });
-      const result = await parseApiResponse(response);
-      if (!response.ok) throw new Error(result.message || "Gagal update pembayaran.");
-      setMessage("Status pembayaran berhasil diperbarui.");
-      await loadPembayaran();
-    } catch (err) {
-      setError(err.message || "Terjadi kesalahan.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  /* ── Derived: filtered events ────────────────────────── */
+  const filtered = useMemo(() => {
+    return events.filter(e => {
+      const matchSearch =
+        !search ||
+        (e.nama_event || "").toLowerCase().includes(search.toLowerCase()) ||
+        (e.penyelenggara || e.nama_penyelenggara || "").toLowerCase().includes(search.toLowerCase());
+      const matchKat =
+        !filterKat ||
+        String(e.kategori_id) === filterKat ||
+        (e.nama_kategori || e.category || "") === filterKat;
+      const matchOrg =
+        !filterOrg ||
+        (e.penyelenggara || e.nama_penyelenggara || "") === filterOrg;
+      return matchSearch && matchKat && matchOrg;
+    });
+  }, [events, search, filterKat, filterOrg]);
 
-  const submitMetode = async (e) => {
-    e.preventDefault();
-    try {
-      setLoading(true);
-      const response = await fetch(buildApiUrl("/api/metode-pembayaran"), {
-        method: "POST",
-        headers: { ...authHeaders, "Content-Type": "application/json" },
-        body: JSON.stringify(metodeForm),
-      });
-      const result = await parseApiResponse(response);
-      if (!response.ok) throw new Error(result.message || "Gagal tambah metode.");
-      setMessage("Metode pembayaran berhasil ditambahkan.");
-      setMetodeForm(emptyMetodeForm);
-      await loadMetode();
-    } catch (err) {
-      setError(err.message || "Terjadi kesalahan.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const totalPages = perPage === "Semua" ? 1 : Math.max(1, Math.ceil(filtered.length / perPage));
+  const safePage = Math.min(currentPage, totalPages);
 
-  const submitBerita = async (e) => {
-    e.preventDefault();
-    setError("");
-    setMessage("");
-    try {
-      setLoading(true);
-      const url = editingBeritaId ? buildApiUrl(`/api/berita/${editingBeritaId}`) : buildApiUrl("/api/berita");
-      const response = await fetch(url, {
-        method: editingBeritaId ? "PUT" : "POST",
-        headers: { ...authHeaders, "Content-Type": "application/json" },
-        body: JSON.stringify(beritaForm),
-      });
-      const result = await parseApiResponse(response);
-      if (!response.ok) throw new Error(result.message || "Gagal menyimpan berita.");
+  const paginated = useMemo(() => {
+    if (perPage === "Semua") return filtered;
+    const start = (safePage - 1) * perPage;
+    return filtered.slice(start, start + perPage);
+  }, [filtered, perPage, safePage]);
 
-      setMessage(editingBeritaId ? "Berita berhasil diupdate." : "Berita berhasil ditambahkan.");
-      setBeritaForm(emptyBeritaForm);
-      setEditingBeritaId(null);
-      await loadBerita();
-    } catch (err) {
-      setError(err.message || "Terjadi kesalahan.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const resetPage = () => setCurrentPage(1);
 
-  const deleteBerita = async (id) => {
-    if (!window.confirm("Hapus berita ini?")) return;
-    try {
-      setLoading(true);
-      const response = await fetch(buildApiUrl(`/api/berita/${id}`), {
-        method: "DELETE",
-        headers: authHeaders,
-      });
-      const result = await parseApiResponse(response);
-      if (!response.ok) throw new Error(result.message || "Gagal hapus berita.");
-      setMessage("Berita berhasil dihapus.");
-      await loadBerita();
-    } catch (err) {
-      setError(err.message || "Terjadi kesalahan.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  /* ── Chart data ──────────────────────────────────────── */
+  const categoryChartData = useMemo(() => {
+    const map = {};
+    events.forEach(e => {
+      const kat = e.nama_kategori || e.category || "Lainnya";
+      map[kat] = (map[kat] || 0) + 1;
+    });
+    return Object.entries(map).map(([name, value]) => ({ name, value }));
+  }, [events]);
 
-  const submitKategoriBerita = async (e) => {
-    e.preventDefault();
-    setError("");
-    setMessage("");
-    try {
-      setLoading(true);
-      const url = editingKategoriBeritaId ? buildApiUrl(`/api/kategori-berita/${editingKategoriBeritaId}`) : buildApiUrl("/api/kategori-berita");
-      const response = await fetch(url, {
-        method: editingKategoriBeritaId ? "PUT" : "POST",
-        headers: { ...authHeaders, "Content-Type": "application/json" },
-        body: JSON.stringify(kategoriBeritaForm),
-      });
-      const result = await parseApiResponse(response);
-      if (!response.ok) throw new Error(result.message || "Gagal menyimpan kategori.");
+  const monthlyChartData = useMemo(() => {
+    const map = {};
+    events.forEach(e => {
+      if (!e.tanggal) return;
+      const d = new Date(e.tanggal);
+      if (isNaN(d)) return;
+      const key = d.toLocaleDateString("id-ID", { month: "short", year: "2-digit" });
+      map[key] = (map[key] || 0) + 1;
+    });
+    const sorted = Object.entries(map)
+      .sort((a, b) => {
+        const parse = s => { const [m, y] = s.split(" "); return new Date(`${m} 20${y}`); };
+        return parse(a[0]) - parse(b[0]);
+      })
+      .slice(-12);
+    return sorted.map(([name, total]) => ({ name, total }));
+  }, [events]);
 
-      setMessage(editingKategoriBeritaId ? "Kategori berhasil diupdate." : "Kategori berhasil ditambahkan.");
-      setKategoriBeritaForm(emptyKategoriBeritaForm);
-      setEditingKategoriBeritaId(null);
-      await loadKategoriBerita();
-    } catch (err) {
-      setError(err.message || "Terjadi kesalahan.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Stats
+  const totalEvent = events.length;
+  const upcoming = events.filter(e => e.tanggal && new Date(e.tanggal) > new Date()).length;
+  const selesai = totalEvent - upcoming;
+  const totalKat = categoryChartData.length;
 
-  const deleteKategoriBerita = async (id) => {
-    if (!window.confirm("Hapus kategori ini? Semua berita dalam kategori ini akan terhapus.")) return;
-    try {
-      setLoading(true);
-      const response = await fetch(buildApiUrl(`/api/kategori-berita/${id}`), {
-        method: "DELETE",
-        headers: authHeaders,
-      });
-      const result = await parseApiResponse(response);
-      if (!response.ok) throw new Error(result.message || "Gagal hapus kategori.");
-      setMessage("Kategori berhasil dihapus.");
-      await loadKategoriBerita();
-    } catch (err) {
-      setError(err.message || "Terjadi kesalahan.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  /* ── Pagination range ────────────────────────────────── */
+  function getPageRange(cur, total) {
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+    const left = Math.max(1, cur - 2);
+    const right = Math.min(total, cur + 2);
+    const pages = [];
+    if (left > 1) { pages.push(1); if (left > 2) pages.push("…"); }
+    for (let i = left; i <= right; i++) pages.push(i);
+    if (right < total) { if (right < total - 1) pages.push("…"); pages.push(total); }
+    return pages;
+  }
 
+  /* ── JSX ─────────────────────────────────────────────── */
   return (
-    <div className="container py-4">
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <h2 className="mb-0">Admin Dashboard</h2>
-        <button type="button" className="btn btn-outline-secondary" onClick={() => { localStorage.clear(); navigate("/auth"); }}>
-          Logout
+    <div className="aep-wrap">
+
+      {/* ── Delete Modal ─────────────────────────────── */}
+      {deleteId && (
+        <div className="aep-modal-overlay" onClick={cancelDelete}>
+          <div className="aep-modal" onClick={e => e.stopPropagation()}>
+            <div className="aep-modal-icon">
+              <Trash2 size={28} />
+            </div>
+            <h3 className="aep-modal-title">Hapus Event?</h3>
+            <p className="aep-modal-desc">Tindakan ini tidak bisa dibatalkan. Event akan dihapus secara permanen.</p>
+            <div className="aep-modal-actions">
+              <button className="aep-modal-cancel" onClick={cancelDelete}>Batal</button>
+              <button className="aep-modal-confirm" onClick={doDelete}>Ya, Hapus</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Page Header ──────────────────────────────── */}
+      <div className="adash-page-header">
+        <div>
+          <h1 className="adash-page-title">Manajemen Event</h1>
+          <p className="adash-page-sub">Kelola seluruh event yang terdaftar di platform</p>
+        </div>
+        <button className="adash-export-btn" onClick={exportToCSV}>
+          <Download size={17} /> Export CSV
         </button>
       </div>
 
-      <div className="btn-group mb-4">
-        <button type="button" className={`btn ${tab === "event" ? "btn-primary" : "btn-outline-primary"}`} onClick={() => setTab("event")}>Event</button>
-        <button type="button" className={`btn ${tab === "pendaftaran" ? "btn-primary" : "btn-outline-primary"}`} onClick={() => setTab("pendaftaran")}>Pendaftaran</button>
-        <button type="button" className={`btn ${tab === "kontak" ? "btn-primary" : "btn-outline-primary"}`} onClick={() => setTab("kontak")}>Kontak Event</button>
-        <button type="button" className={`btn ${tab === "pembayaran" ? "btn-primary" : "btn-outline-primary"}`} onClick={() => setTab("pembayaran")}>Pembayaran</button>
-        <button type="button" className={`btn ${tab === "metode" ? "btn-primary" : "btn-outline-primary"}`} onClick={() => setTab("metode")}>Metode Pembayaran</button>
-        <button type="button" className={`btn ${tab === "berita" ? "btn-primary" : "btn-outline-primary"}`} onClick={() => setTab("berita")}>Berita</button>
-        <button type="button" className={`btn ${tab === "kategori-berita" ? "btn-primary" : "btn-outline-primary"}`} onClick={() => setTab("kategori-berita")}>Kategori Berita</button>
+      {/* ── Alerts ───────────────────────────────────── */}
+      {error && (
+        <div className="aep-alert aep-alert-error">
+          <AlertCircle size={16} style={{ marginRight: 8, verticalAlign: "middle" }} />
+          {error}
+        </div>
+      )}
+      {message && (
+        <div className="aep-alert aep-alert-success">
+          <CheckCircle2 size={16} style={{ marginRight: 8, verticalAlign: "middle" }} />
+          {message}
+        </div>
+      )}
+
+      {/* ── Stat Cards ───────────────────────────────── */}
+      <div className="adash-stats-grid">
+        <StatCard
+          icon={<Calendar size={22} />}
+          label="Total Event"
+          value={totalEvent.toLocaleString()}
+          gradient="linear-gradient(135deg,#7c3aed,#a78bfa)"
+          glow="rgba(124,58,237,0.3)"
+        />
+        <StatCard
+          icon={<Clock size={22} />}
+          label="Akan Datang"
+          value={upcoming.toLocaleString()}
+          gradient="linear-gradient(135deg,#0ea5e9,#22c55e)"
+          glow="rgba(14,165,233,0.3)"
+        />
+        <StatCard
+          icon={<CheckCircle2 size={22} />}
+          label="Selesai"
+          value={selesai.toLocaleString()}
+          gradient="linear-gradient(135deg,#f97316,#fb7185)"
+          glow="rgba(249,115,22,0.3)"
+        />
+        <StatCard
+          icon={<Tag size={22} />}
+          label="Kategori"
+          value={totalKat.toLocaleString()}
+          gradient="linear-gradient(135deg,#06b6d4,#6366f1)"
+          glow="rgba(6,182,212,0.3)"
+        />
       </div>
-      {tab === "pendaftaran" ? (
-        <div className="card"><div className="card-body table-responsive">
-          <table className="table table-striped">
-            <thead><tr><th>ID</th><th>Peserta</th><th>Email</th><th>Event</th><th>Tanggal</th><th>Status</th><th>Aksi</th></tr></thead>
-            <tbody>{pendaftaranList.map((row) => {
-              const id = row.id || row.id_pendaftaran_event;
-              return <tr key={id}>
-                <td>{id}</td>
-                <td>{row.nama_peserta || "-"}</td>
-                <td>{row.email_peserta || "-"}</td>
-                <td>{row.nama_event || "-"}</td>
-                <td>{row.tanggal_daftar || "-"}</td>
-                <td>{row.status_pendaftaran || "-"}</td>
-                <td className="d-flex gap-2">
-                  <button type="button" className="btn btn-sm btn-success" onClick={() => updatePendaftaranStatus(id, "approved")}>Approve</button>
-                  <button type="button" className="btn btn-sm btn-secondary" onClick={() => updatePendaftaranStatus(id, "rejected")}>Reject</button>
-                </td>
-              </tr>;
-            })}</tbody>
-          </table>
-        </div></div>
-      ) : null}
 
+      {/* ── Charts Row ───────────────────────────────── */}
+      <div className="aep-charts-row">
 
-      {error ? <div className="alert alert-danger">{error}</div> : null}
-      {message ? <div className="alert alert-success">{message}</div> : null}
-      {loading ? <p>Memuat...</p> : null}
+        {/* Bar Chart – Event per Bulan */}
+        <div className="adash-chart-card">
+          <div className="adash-chart-head">
+            <div>
+              <h2><Activity size={18} className="adash-sec-icon" /> Tren Event per Bulan</h2>
+              <p>Jumlah event yang diselenggarakan setiap bulan</p>
+            </div>
+          </div>
+          <div className="adash-chart-area">
+            {loading ? (
+              <div className="aep-chart-empty">Memuat grafik…</div>
+            ) : monthlyChartData.length === 0 ? (
+              <div className="aep-chart-empty">Belum ada data</div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={monthlyChartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                  <XAxis dataKey="name" stroke="#475569" tick={{ fill: "#64748b", fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis stroke="#475569" tick={{ fill: "#64748b", fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                  <Tooltip content={<ChartTooltip />} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
+                  <Bar dataKey="total" name="Event" fill="#7c3aed" radius={[6, 6, 0, 0]} maxBarSize={36} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
 
-      {tab === "event" ? (
-        <>
-          <div className="card mb-4"><div className="card-body">
-            <h5>{editingEventId ? "Edit Event" : "Tambah Event"}</h5>
-            <form onSubmit={submitEvent} className="row g-3">
-              <div className="col-md-6"><input className="form-control" placeholder="Nama Event" value={eventForm.nama_event} onChange={(e) => setEventForm((p) => ({ ...p, nama_event: e.target.value }))} required /></div>
-              <div className="col-md-6">
-                <select
-                  className="form-select"
-                  value={eventForm.kategori_id}
-                  onChange={(e) => setEventForm((p) => ({ ...p, kategori_id: e.target.value }))}
-                  required
-                >
-                  <option value="">Pilih Kategori</option>
-                  {kategoriList.map((kategori) => (
-                    <option key={kategori.id || kategori.id_kategori} value={kategori.id || kategori.id_kategori}>
-                      {kategori.nama_kategori || kategori.nama || `Kategori ${kategori.id || kategori.id_kategori}`}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="col-md-6"><input type="date" className="form-control" value={eventForm.tanggal} onChange={(e) => setEventForm((p) => ({ ...p, tanggal: e.target.value }))} required /></div>
-              <div className="col-md-6"><input className="form-control" placeholder="Lokasi" value={eventForm.lokasi} onChange={(e) => setEventForm((p) => ({ ...p, lokasi: e.target.value }))} required /></div>
-              <div className="col-md-6"><input type="number" min="0" className="form-control" placeholder="Harga Tiket (kosongkan jika gratis)" value={eventForm.harga} onChange={(e) => setEventForm((p) => ({ ...p, harga: e.target.value }))} /></div>
-              <div className="col-12"><textarea className="form-control" rows="3" placeholder="Deskripsi" value={eventForm.deskripsi} onChange={(e) => setEventForm((p) => ({ ...p, deskripsi: e.target.value }))} required /></div>
-              <div className="col-12"><input type="file" className="form-control" accept="image/*" onChange={(e) => setEventForm((p) => ({ ...p, foto_event: e.target.files?.[0] || null }))} /></div>
-              <div className="col-12 d-flex gap-2">
-                <button type="submit" className="btn btn-primary">{editingEventId ? "Update" : "Tambah"}</button>
-                {editingEventId ? <button type="button" className="btn btn-secondary" onClick={() => { setEditingEventId(null); setEventForm(emptyEventForm); }}>Batal</button> : null}
-              </div>
-            </form>
-          </div></div>
-          <div className="card"><div className="card-body table-responsive">
-            <table className="table table-striped">
-              <thead><tr><th>Nama</th><th>Kategori</th><th>Tanggal</th><th>Lokasi</th><th>Harga</th><th>Foto</th><th>Aksi</th></tr></thead>
-              <tbody>
-                {events.map((row) => {
-                  const id = row.id || row.id_event;
-                  return <tr key={id}>
-                    <td>{row.nama_event}</td><td>{row.category || row.nama_kategori || "-"}</td><td>{row.tanggal}</td><td>{row.lokasi}</td><td>Rp {Number(row.harga || 0).toLocaleString("id-ID")}</td><td>{row.foto_event || "-"}</td>
-                    <td className="d-flex gap-2">
-                      <button type="button" className="btn btn-sm btn-warning" onClick={() => { setEditingEventId(id); setEventForm({ nama_event: row.nama_event || "", kategori_id: String(row.kategori_id || ""), deskripsi: row.deskripsi || "", tanggal: row.tanggal || "", lokasi: row.lokasi || "", harga: String(row.harga || ""), foto_event: null }); }}>Edit</button>
-                      <button type="button" className="btn btn-sm btn-danger" onClick={() => deleteEvent(id)}>Hapus</button>
+        {/* Pie Chart – Distribusi Kategori */}
+        <div className="adash-chart-card">
+          <div className="adash-chart-head">
+            <div>
+              <h2><PieIcon size={18} className="adash-sec-icon" /> Distribusi Kategori</h2>
+              <p>Sebaran event berdasarkan kategori</p>
+            </div>
+          </div>
+          <div className="adash-chart-area">
+            {loading ? (
+              <div className="aep-chart-empty">Memuat grafik…</div>
+            ) : categoryChartData.length === 0 ? (
+              <div className="aep-chart-empty">Belum ada data</div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={categoryChartData}
+                    cx="50%" cy="45%"
+                    innerRadius="38%" outerRadius="68%"
+                    paddingAngle={3}
+                    dataKey="value"
+                    labelLine={false}
+                    label={PieLabel}
+                  >
+                    {categoryChartData.map((_, i) => (
+                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ background: "#1e293b", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8 }}
+                    itemStyle={{ color: "#e2e8f0" }}
+                    labelStyle={{ color: "#f8fafc", fontWeight: 700 }}
+                  />
+                  <Legend
+                    iconType="circle"
+                    iconSize={9}
+                    wrapperStyle={{ fontSize: "0.82rem", color: "#94a3b8", paddingTop: "0.5rem" }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Event Table Card ─────────────────────────── */}
+      <div className="aep-table-card">
+
+        {/* Toolbar */}
+        <div className="aep-toolbar">
+          {/* Search */}
+          <div className="aep-search-wrap">
+            <Search size={15} className="aep-search-icon" />
+            <input
+              id="aep-search"
+              className="aep-search"
+              placeholder="Cari nama event atau penyelenggara…"
+              value={search}
+              onChange={e => { setSearch(e.target.value); resetPage(); }}
+            />
+          </div>
+
+          {/* Filter Kategori */}
+          <div className="aep-filter-wrap">
+            <Tag size={14} className="aep-filter-icon" />
+            <select
+              id="aep-filter-kategori"
+              className="aep-filter-select"
+              value={filterKat}
+              onChange={e => { setFilterKat(e.target.value); resetPage(); }}
+            >
+              <option value="">Semua Kategori</option>
+              {kategoriList.map(k => {
+                const id = String(k.id || k.id_kategori);
+                const name = k.nama_kategori || k.nama || `Kategori ${id}`;
+                return <option key={id} value={id}>{name}</option>;
+              })}
+            </select>
+          </div>
+
+          {/* Filter Penyelenggara */}
+          <div className="aep-filter-wrap">
+            <Users2 size={14} className="aep-filter-icon" />
+            <select
+              id="aep-filter-organizer"
+              className="aep-filter-select"
+              value={filterOrg}
+              onChange={e => { setFilterOrg(e.target.value); resetPage(); }}
+            >
+              <option value="">Semua Penyelenggara</option>
+              {penyelenggaraList.map(org => (
+                <option key={org} value={org}>{org}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Per-page */}
+          <select
+            id="aep-per-page"
+            className="aep-filter-select"
+            value={perPage}
+            onChange={e => {
+              const v = e.target.value;
+              setPerPage(v === "Semua" ? "Semua" : Number(v));
+              resetPage();
+            }}
+          >
+            {PER_PAGE_OPTIONS.map(o => (
+              <option key={o} value={o}>{o === "Semua" ? "Semua" : `${o} / halaman`}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Summary */}
+        <div className="aep-summary">
+          Menampilkan <strong>{paginated.length}</strong> dari <strong>{filtered.length}</strong> event
+          {(search || filterKat || filterOrg) && " (difilter)"}
+        </div>
+
+        {/* Table */}
+        <div className="aep-table-wrap">
+          <table className="aep-table">
+            <thead>
+              <tr>
+                <th><span className="aep-th-inner">#</span></th>
+                <th><span className="aep-th-inner"><Calendar size={13} /> Judul Event</span></th>
+                <th><span className="aep-th-inner">Tanggal</span></th>
+                <th><span className="aep-th-inner"><Users2 size={13} /> Penyelenggara</span></th>
+                <th><span className="aep-th-inner"><Tag size={13} /> Kategori</span></th>
+                <th><span className="aep-th-inner">Status</span></th>
+                <th><span className="aep-th-inner">Aksi</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="aep-td-center">
+                    <div className="aep-loading">
+                      <span className="aep-spinner" />
+                      Memuat data event…
+                    </div>
+                  </td>
+                </tr>
+              ) : paginated.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="aep-td-center">
+                    <div className="aep-empty">
+                      <Calendar size={32} style={{ marginBottom: 8, opacity: 0.3 }} />
+                      <br />Tidak ada event yang ditemukan
+                    </div>
+                  </td>
+                </tr>
+              ) : paginated.map((ev, idx) => {
+                const id = ev.id || ev.id_event;
+                const rowNum = perPage === "Semua" ? idx + 1 : (safePage - 1) * perPage + idx + 1;
+                const status = getStatusBadge(ev.tanggal);
+                const organizer = ev.penyelenggara || ev.nama_penyelenggara || "-";
+                const kategori = ev.nama_kategori || ev.category || "-";
+
+                return (
+                  <tr key={id} className="aep-tr">
+                    <td className="aep-td-num">{rowNum}</td>
+                    <td className="aep-td-judul" title={ev.nama_event}>{ev.nama_event}</td>
+                    <td className="aep-td-date">{formatDate(ev.tanggal)}</td>
+                    <td>{organizer}</td>
+                    <td><span className="aep-kat-badge">{kategori}</span></td>
+                    <td>
+                      <span className={`aep-badge ${status.cls}`}>{status.label}</span>
                     </td>
-                  </tr>;
-                })}
-              </tbody>
-            </table>
-          </div></div>
-        </>
-      ) : null}
-
-      {tab === "kontak" ? (
-        <div className="card"><div className="card-body table-responsive">
-          <h5 className="mb-3">Pesan Masuk dari Contact Page</h5>
-          <table className="table table-striped">
-            <thead><tr><th>ID</th><th>Nama</th><th>Email</th><th>No HP</th><th>Judul Event</th><th>Deskripsi</th><th>Pesan</th><th>Status</th><th>Tanggal</th><th>Aksi</th></tr></thead>
-            <tbody>{kontakList.map((row) => {
-              const id = row.id || row.id_kontak_event;
-              return <tr key={id}>
-                <td>{id}</td>
-                <td>{row.nama || "-"}</td>
-                <td>{row.email || "-"}</td>
-                <td>{row.no_hp || "-"}</td>
-                <td>{row.judul_event || "-"}</td>
-                <td style={{maxWidth: '200px'}}>{row.deskripsi_event || "-"}</td>
-                <td style={{maxWidth: '250px'}}>{row.pesan || "-"}</td>
-                <td><span className={`badge ${row.status === 'approved' ? 'bg-success' : row.status === 'rejected' ? 'bg-danger' : 'bg-warning'}`}>{row.status || "pending"}</span></td>
-                <td>{row.created_at ? new Date(row.created_at).toLocaleDateString('id-ID') : "-"}</td>
-                <td className="d-flex gap-2">
-                  <button type="button" className="btn btn-sm btn-success" onClick={() => updateKontakStatus(row, "approved")}>Approve</button>
-                  <button type="button" className="btn btn-sm btn-danger" onClick={() => updateKontakStatus(row, "rejected")}>Reject</button>
-                </td>
-              </tr>;
-            })}</tbody>
+                    <td>
+                      <button
+                        id={`aep-delete-${id}`}
+                        className="aep-btn-delete"
+                        onClick={() => confirmDelete(id)}
+                        title="Hapus event"
+                      >
+                        <Trash2 size={14} /> Hapus
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
           </table>
-        </div></div>
-      ) : null}
+        </div>
 
-      {tab === "pembayaran" ? (
-        <div className="card"><div className="card-body table-responsive">
-          <table className="table table-striped">
-            <thead><tr><th>ID</th><th>Peserta</th><th>Event</th><th>Jumlah</th><th>Metode</th><th>Bukti</th><th>Status</th><th>Aksi</th></tr></thead>
-            <tbody>{pembayaranList.map((row) => {
-              const id = row.id || row.id_pembayaran;
-              return <tr key={id}>
-                <td>{id}</td>
-                <td>{row.nama_peserta || "-"}</td>
-                <td>{row.nama_event || "-"}</td>
-                <td>Rp {Number(row.jumlah_bayar || 0).toLocaleString("id-ID")}</td>
-                <td>{typeof row.metode_pembayaran === "string" ? row.metode_pembayaran : (row.metode_pembayaran?.nama_metode || "-")}</td>
-                <td>
-                  {row.bukti_pembayaran_url ? (
-                    <a href={row.bukti_pembayaran_url} target="_blank" rel="noreferrer" className="btn btn-sm btn-outline-primary">
-                      Lihat Bukti
-                    </a>
-                  ) : (
-                    <span className="text-muted">-</span>
-                  )}
-                </td>
-                <td>{row.status_pembayaran}</td>
-                <td className="d-flex gap-2">
-                  <button type="button" className="btn btn-sm btn-success" onClick={() => updatePembayaranStatus(id, "verified")}>Verifikasi</button>
-                  <button type="button" className="btn btn-sm btn-secondary" onClick={() => updatePembayaranStatus(id, "rejected")}>Tolak</button>
-                </td>
-              </tr>;
-            })}</tbody>
-          </table>
-        </div></div>
-      ) : null}
+        {/* Pagination */}
+        {perPage !== "Semua" && totalPages > 1 && (
+          <div className="aep-pagination">
+            <button
+              className="aep-page-btn"
+              disabled={safePage === 1}
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              id="aep-prev-page"
+            >
+              <ChevronLeft size={16} />
+            </button>
 
-      {tab === "metode" ? (
-        <>
-          <div className="card mb-4"><div className="card-body">
-            <h5>Tambah Metode Pembayaran</h5>
-            <form onSubmit={submitMetode} className="row g-3">
-              <div className="col-md-4"><input className="form-control" placeholder="Nama Metode" value={metodeForm.nama_metode} onChange={(e) => setMetodeForm((p) => ({ ...p, nama_metode: e.target.value }))} required /></div>
-              <div className="col-md-4"><input className="form-control" placeholder="Nomor Tujuan" value={metodeForm.nomor_tujuan} onChange={(e) => setMetodeForm((p) => ({ ...p, nomor_tujuan: e.target.value }))} required /></div>
-              <div className="col-md-4"><input className="form-control" placeholder="Atas Nama" value={metodeForm.atas_nama} onChange={(e) => setMetodeForm((p) => ({ ...p, atas_nama: e.target.value }))} required /></div>
-              <div className="col-12"><button type="submit" className="btn btn-primary">Tambah Metode</button></div>
-            </form>
-          </div></div>
-          <div className="card"><div className="card-body table-responsive">
-            <table className="table table-striped">
-              <thead><tr><th>Nama Metode</th><th>Nomor Tujuan</th><th>Atas Nama</th></tr></thead>
-              <tbody>{metodeList.map((row) => <tr key={row.id || row.id_metode_pembayaran}><td>{row.nama_metode}</td><td>{row.nomor_tujuan}</td><td>{row.atas_nama}</td></tr>)}</tbody>
-            </table>
-          </div></div>
-        </>
-      ) : null}
-
-      {tab === "kategori-berita" ? (
-        <>
-          <div className="card mb-4"><div className="card-body">
-            <h5>{editingKategoriBeritaId ? "Edit Kategori Berita" : "Tambah Kategori Berita"}</h5>
-            <form onSubmit={submitKategoriBerita} className="row g-3">
-              <div className="col-md-8">
-                <input 
-                  className="form-control" 
-                  placeholder="Nama Kategori (contoh: Technology, Tips & Tricks)" 
-                  value={kategoriBeritaForm.nama_kategori} 
-                  onChange={(e) => setKategoriBeritaForm((p) => ({ ...p, nama_kategori: e.target.value }))} 
-                  required 
-                />
-              </div>
-              <div className="col-md-4 d-flex gap-2">
-                <button type="submit" className="btn btn-primary">{editingKategoriBeritaId ? "Update" : "Tambah"}</button>
-                {editingKategoriBeritaId && (
-                  <button type="button" className="btn btn-secondary" onClick={() => { setEditingKategoriBeritaId(null); setKategoriBeritaForm(emptyKategoriBeritaForm); }}>Batal</button>
-                )}
-              </div>
-            </form>
-          </div></div>
-          <div className="card"><div className="card-body table-responsive">
-            <table className="table table-striped">
-              <thead><tr><th>ID</th><th>Nama Kategori</th><th>Jumlah Berita</th><th>Aksi</th></tr></thead>
-              <tbody>{kategoriBeritaList.map((row) => {
-                const id = row.id;
-                const jumlahBerita = beritaList.filter(b => b.kategori_id === id).length;
-                return <tr key={id}>
-                  <td>{id}</td>
-                  <td>{row.nama_kategori}</td>
-                  <td>{jumlahBerita}</td>
-                  <td className="d-flex gap-2">
-                    <button type="button" className="btn btn-sm btn-warning" onClick={() => { setEditingKategoriBeritaId(id); setKategoriBeritaForm({ nama_kategori: row.nama_kategori || "" }); }}>Edit</button>
-                    <button type="button" className="btn btn-sm btn-danger" onClick={() => deleteKategoriBerita(id)}>Hapus</button>
-                  </td>
-                </tr>;
-              })}</tbody>
-            </table>
-          </div></div>
-        </>
-      ) : null}
-
-      {tab === "berita" ? (
-        <>
-          <div className="card mb-4"><div className="card-body">
-            <h5>{editingBeritaId ? "Edit Berita" : "Tambah Berita"}</h5>
-            <form onSubmit={submitBerita} className="row g-3">
-              <div className="col-md-8">
-                <input className="form-control" placeholder="Judul Berita" value={beritaForm.judul} onChange={(e) => setBeritaForm((p) => ({ ...p, judul: e.target.value }))} required />
-              </div>
-              <div className="col-md-4">
-                <select
-                  className="form-select"
-                  value={beritaForm.kategori_id}
-                  onChange={(e) => setBeritaForm((p) => ({ ...p, kategori_id: e.target.value }))}
-                  required
+            {getPageRange(safePage, totalPages).map((p, i) =>
+              p === "…" ? (
+                <span key={`ell-${i}`} className="aep-page-ellipsis">…</span>
+              ) : (
+                <button
+                  key={p}
+                  id={`aep-page-${p}`}
+                  className={`aep-page-btn ${safePage === p ? "active" : ""}`}
+                  onClick={() => setCurrentPage(p)}
                 >
-                  <option value="">Pilih Kategori</option>
-                  {kategoriBeritaList.map((kat) => (
-                    <option key={kat.id} value={kat.id}>{kat.nama_kategori}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="col-md-6">
-                <input className="form-control" placeholder="Link Sumber (URL)" value={beritaForm.sumber} onChange={(e) => setBeritaForm((p) => ({ ...p, sumber: e.target.value }))} required type="url" />
-              </div>
-              <div className="col-md-6">
-                <input type="date" className="form-control" value={beritaForm.tanggal} onChange={(e) => setBeritaForm((p) => ({ ...p, tanggal: e.target.value }))} required />
-              </div>
-              <div className="col-12">
-                <input className="form-control" placeholder="URL Gambar (optional)" value={beritaForm.gambar} onChange={(e) => setBeritaForm((p) => ({ ...p, gambar: e.target.value }))} />
-              </div>
-              <div className="col-12">
-                <textarea className="form-control" rows="2" placeholder="Ringkasan Berita" value={beritaForm.ringkasan} onChange={(e) => setBeritaForm((p) => ({ ...p, ringkasan: e.target.value }))} required />
-              </div>
-              <div className="col-12">
-                <textarea className="form-control" rows="5" placeholder="Konten Lengkap Berita" value={beritaForm.konten} onChange={(e) => setBeritaForm((p) => ({ ...p, konten: e.target.value }))} required />
-              </div>
-              <div className="col-12 d-flex gap-2">
-                <button type="submit" className="btn btn-primary">{editingBeritaId ? "Update" : "Tambah"}</button>
-                {editingBeritaId && (
-                  <button type="button" className="btn btn-secondary" onClick={() => { setEditingBeritaId(null); setBeritaForm(emptyBeritaForm); }}>Batal</button>
-                )}
-              </div>
-            </form>
-          </div></div>
-          <div className="card"><div className="card-body table-responsive">
-            <table className="table table-striped">
-              <thead><tr><th>ID</th><th>Judul</th><th>Kategori</th><th>Tanggal</th><th>Sumber</th><th>Aksi</th></tr></thead>
-              <tbody>{beritaList.map((row) => {
-                const id = row.id;
-                const kategoriNama = row.kategori ? row.kategori.nama_kategori : "-";
-                return <tr key={id}>
-                  <td>{id}</td>
-                  <td style={{maxWidth: '300px'}}>{row.judul}</td>
-                  <td><span className="badge bg-info">{kategoriNama}</span></td>
-                  <td>{row.tanggal ? new Date(row.tanggal).toLocaleDateString('id-ID') : "-"}</td>
-                  <td>
-                    {row.sumber ? (
-                      <a href={row.sumber} target="_blank" rel="noreferrer" className="btn btn-sm btn-outline-primary">Lihat</a>
-                    ) : "-"}
-                  </td>
-                  <td className="d-flex gap-2">
-                    <button type="button" className="btn btn-sm btn-warning" onClick={() => { 
-                      setEditingBeritaId(id); 
-                      setBeritaForm({ 
-                        judul: row.judul || "", 
-                        kategori_id: String(row.kategori_id || ""), 
-                        sumber: row.sumber || "", 
-                        ringkasan: row.ringkasan || "", 
-                        konten: row.konten || "", 
-                        gambar: row.gambar || "", 
-                        tanggal: row.tanggal ? row.tanggal.split('T')[0] : "" 
-                      }); 
-                    }}>Edit</button>
-                    <button type="button" className="btn btn-sm btn-danger" onClick={() => deleteBerita(id)}>Hapus</button>
-                  </td>
-                </tr>;
-              })}</tbody>
-            </table>
-          </div></div>
-        </>
-      ) : null}
+                  {p}
+                </button>
+              )
+            )}
 
+            <button
+              className="aep-page-btn"
+              disabled={safePage === totalPages}
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              id="aep-next-page"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

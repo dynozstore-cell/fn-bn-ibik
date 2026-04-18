@@ -12,25 +12,25 @@
   --purple-800: #6b21a8;
   --purple-900: #581c87;
   --purple-950: #3b0764;
-  
+
   /* Blue Accent */
   --blue-400: #60a5fa;
   --blue-500: #3b82f6;
   --blue-600: #2563eb;
-  
+
   /* Background - More balanced */
   --bg-darkest: #0f0d1a;
   --bg-darker: #16131f;
   --bg-dark: #1e1a2e;
   --bg-card: rgba(30, 26, 46, 0.7);
-  
+
   /* Text Colors */
   --white: #ffffff;
   --white-95: #f2f0f7;
   --white-muted: rgba(255, 255, 255, 0.85);
   --white-soft: rgba(255, 255, 255, 0.65);
   --white-dim: rgba(255, 255, 255, 0.45);
-  
+
   /* Radius */
   --radius: 12px;
   --radius-lg: 16px;
@@ -314,8 +314,13 @@ a {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* Page transition animation */
@@ -849,7 +854,7 @@ body {
   display: grid;
   grid-template-rows: 320px 1fr;
   height: 100%;
-  box-shadow: 
+  box-shadow:
     0 0 40px rgba(168, 85, 247, 0.12),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(10px);
@@ -860,7 +865,7 @@ body {
 
 .news-featured-card:hover {
   border-color: rgba(168, 85, 247, 0.45);
-  box-shadow: 
+  box-shadow:
     0 0 60px rgba(168, 85, 247, 0.2),
     0 8px 32px rgba(168, 85, 247, 0.15),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
@@ -1037,7 +1042,7 @@ body {
   border: 1px solid rgba(168, 85, 247, 0.30);
   border-radius: 16px;
   padding: 20px;
-  box-shadow: 0 12px 24px rgba(0,0,0,0.25);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.25);
 }
 
 .contact-card h3 {
@@ -1239,7 +1244,7 @@ body {
 .news-preview-card--active {
   background: linear-gradient(135deg, rgba(168, 85, 247, 0.18), rgba(99, 102, 241, 0.1));
   border-color: rgba(168, 85, 247, 0.5);
-  box-shadow: 
+  box-shadow:
     0 0 18px rgba(168, 85, 247, 0.18),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
@@ -1331,7 +1336,7 @@ body {
   max-width: 800px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 
+  box-shadow:
     0 0 60px rgba(168, 85, 247, 0.3),
     0 20px 60px rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(20px);
@@ -1465,6 +1470,7 @@ body {
     opacity: 0;
     transform: translateX(-30px) rotateY(10deg);
   }
+
   to {
     opacity: 1;
     transform: translateX(0) rotateY(0deg);
@@ -1476,6 +1482,7 @@ body {
     opacity: 0;
     transform: translateY(40px) scale(0.95);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -1695,7 +1702,7 @@ body {
   scroll-behavior: smooth;
 }
 
-.latest-row > * {
+.latest-row>* {
   flex: 0 0 clamp(280px, 32vw, 380px);
 }
 
@@ -1878,6 +1885,7 @@ body {
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -1894,6 +1902,7 @@ body {
     transform: translateY(24px);
     filter: blur(4px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -1906,6 +1915,7 @@ body {
     opacity: 0;
     transform: translateY(16px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -2022,6 +2032,7 @@ body {
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -2215,7 +2226,7 @@ body {
   border-radius: 20px;
 }
 
-.banner-carousel > * {
+.banner-carousel>* {
   flex: 0 0 clamp(340px, 85vw, 100%);
 }
 
@@ -2333,12 +2344,10 @@ body {
 .banner-slide-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    180deg,
-    rgba(0, 0, 0, 0) 0%,
-    rgba(0, 0, 0, 0.35) 60%,
-    rgba(0, 0, 0, 0.65) 100%
-  );
+  background: linear-gradient(180deg,
+      rgba(0, 0, 0, 0) 0%,
+      rgba(0, 0, 0, 0.35) 60%,
+      rgba(0, 0, 0, 0.65) 100%);
   z-index: 1;
 }
 
@@ -2489,7 +2498,7 @@ body {
     padding: 8px 6px 12px;
   }
 
-  .banner-carousel > * {
+  .banner-carousel>* {
     flex: 0 0 clamp(290px, 90vw, 100%);
   }
 
@@ -2620,7 +2629,7 @@ body {
     padding: 6px 4px 10px;
   }
 
-  .banner-carousel > * {
+  .banner-carousel>* {
     flex: 0 0 clamp(260px, 95vw, 100%);
   }
 
@@ -3061,6 +3070,7 @@ body {
       opacity: 0;
       transform: translateY(24px);
     }
+
     to {
       opacity: 1;
       transform: translateY(0);
@@ -3122,6 +3132,7 @@ body {
 
 /* Latest row: mobile polish */
 @media (max-width: 768px) {
+
   /* Tablet optimization for event cards animations */
   .events-grid {
     grid-template-columns: repeat(2, 1fr);
@@ -3141,7 +3152,8 @@ body {
   }
 
   .latest-nav {
-    display: none; /* swipe-first di mobile */
+    display: none;
+    /* swipe-first di mobile */
   }
 
   .latest-row {

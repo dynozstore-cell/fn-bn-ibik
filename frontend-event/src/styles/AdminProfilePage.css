@@ -1,0 +1,447 @@
+/* ===== AdminProfilePage — Premium Redesign ===== */
+
+/* ── Keyframes ─────────────────────────────────────────── */
+@keyframes aprof-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.aprof-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  animation: aprof-in 0.4s ease both;
+}
+
+.fade-in { animation: aprof-in 0.3s ease both; }
+
+/* ── Toast ─────────────────────────────────────────────── */
+.aprof-toast {
+  position: fixed;
+  bottom: 2rem; right: 2rem;
+  background: #10b981;
+  color: #fff;
+  padding: 0.85rem 1.5rem;
+  border-radius: 14px;
+  font-weight: 600;
+  font-size: 0.92rem;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  box-shadow: 0 8px 24px rgba(16,185,129,0.35);
+  transform: translateY(120%);
+  opacity: 0;
+  transition: all 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 9999;
+}
+.aprof-toast.show { transform: translateY(0); opacity: 1; }
+
+/* ══════════════════════════════════════════════════════════
+   HEADER PROFILE (No Banner)
+══════════════════════════════════════════════════════════ */
+.aprof-header-profile {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  background: #1e293b;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 1.25rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 8px 30px -8px rgba(0,0,0,0.3);
+}
+
+.aprof-header-profile-left {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+/* ── Avatar ─────────────────────── */
+.aprof-avatar-container {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.aprof-avatar-ring {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  border: 3px solid #0f172a;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.25);
+  overflow: hidden;
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+}
+
+.aprof-avatar-img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.aprof-avatar-initials {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 2rem;
+  font-weight: 800;
+  color: rgba(255,255,255,0.9);
+  letter-spacing: -1px;
+}
+
+.aprof-avatar-cam {
+  position: absolute;
+  bottom: 0; right: 0;
+  width: 28px; height: 28px;
+  background: #3b82f6;
+  border-radius: 50%;
+  border: 2px solid #0f172a;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+}
+.aprof-avatar-cam:hover { background: #2563eb; transform: scale(1.1); }
+
+/* ── User info ───────────────────────────────────── */
+.aprof-user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.aprof-user-name {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #f8fafc;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.aprof-user-badges {
+  display: flex; gap: 0.6rem; flex-wrap: wrap;
+}
+
+.aprof-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 0.25rem 0.8rem;
+  border-radius: 99px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.aprof-badge.blue {
+  background: rgba(59,130,246,0.18);
+  color: #93c5fd;
+  border: 1px solid rgba(59,130,246,0.25);
+}
+.aprof-badge.gray {
+  background: rgba(255,255,255,0.07);
+  color: #94a3b8;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+/* ── Logout Button ───────────────────────────────────── */
+.aprof-logout-btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: rgba(239,68,68,0.12);
+  color: #fca5a5;
+  border: 1px solid rgba(239,68,68,0.25);
+  padding: 0.6rem 1.25rem;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.aprof-logout-btn:hover {
+  background: rgba(239,68,68,0.22);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(239,68,68,0.2);
+}
+
+/* ══════════════════════════════════════════════════════════
+   BODY (below hero)
+══════════════════════════════════════════════════════════ */
+.aprof-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* ── Tab Row ─────────────────────────────────────────── */
+.aprof-tab-row {
+  display: flex;
+  gap: 0.5rem;
+  background: #1e293b;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 6px;
+  width: fit-content;
+}
+
+.aprof-tab {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: transparent;
+  border: none;
+  color: #64748b;
+  font-weight: 500;
+  font-size: 0.9rem;
+  padding: 0.65rem 1.4rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.aprof-tab:hover { color: #e2e8f0; background: rgba(255,255,255,0.04); }
+.aprof-tab.active {
+  background: #0f172a;
+  color: #f8fafc;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+/* ── Card / Form Panel ───────────────────────────────── */
+.aprof-card {
+  background: #1e293b;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 1.25rem;
+  padding: 2.5rem;
+  box-shadow: 0 8px 30px -8px rgba(0,0,0,0.3);
+}
+
+.aprof-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.aprof-card-head h2 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #f1f5f9;
+  margin: 0 0 0.35rem;
+  display: flex; align-items: center; gap: 10px;
+}
+.aprof-card-icon { color: #3b82f6; }
+
+.aprof-card-head > div > p {
+  font-size: 0.9rem;
+  color: #64748b;
+  margin: 0;
+}
+
+.aprof-unsaved-badge {
+  background: rgba(245,158,11,0.12);
+  color: #fbbf24;
+  border: 1px solid rgba(245,158,11,0.22);
+  border-radius: 99px;
+  padding: 0.3rem 0.9rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ── Form ────────────────────────────────────────────── */
+.aprof-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.aprof-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+.aprof-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.aprof-field label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #94a3b8;
+}
+
+/* Input */
+.aprof-input {
+  background: rgba(15,23,42,0.55);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  padding: 0.8rem 1rem;
+  color: #f1f5f9;
+  font-size: 0.95rem;
+  outline: none;
+  transition: all 0.2s;
+  width: 100%;
+}
+.aprof-input:focus {
+  border-color: #3b82f6;
+  background: rgba(15,23,42,0.85);
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+}
+textarea.aprof-input { resize: vertical; line-height: 1.6; }
+
+/* Input with icon */
+.aprof-input-icon-wrap {
+  position: relative;
+  display: flex; align-items: center;
+}
+.aprof-input-icon-left {
+  position: absolute;
+  left: 14px;
+  color: #475569;
+  pointer-events: none;
+}
+.aprof-input.has-icon { padding-left: 2.6rem; }
+
+.aprof-toggle-pw {
+  position: absolute; right: 12px;
+  background: none; border: none;
+  color: #475569; cursor: pointer;
+  display: flex; align-items: center;
+  padding: 4px;
+  border-radius: 6px;
+  transition: color 0.2s;
+}
+.aprof-toggle-pw:hover { color: #94a3b8; }
+
+/* Hint */
+.aprof-hint {
+  font-size: 0.78rem;
+  color: #475569;
+  display: flex; align-items: center; gap: 5px;
+}
+
+/* ── Password Strength ───────────────────────────────── */
+.aprof-strength-wrap {
+  display: flex; align-items: center; gap: 10px;
+  margin-top: 4px;
+}
+.aprof-strength-bar-row {
+  display: flex; gap: 5px; flex: 1;
+}
+.aprof-strength-seg {
+  flex: 1; height: 5px; border-radius: 99px;
+  transition: background 0.3s;
+}
+.aprof-strength-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  min-width: 36px;
+  text-align: right;
+  transition: color 0.3s;
+}
+
+/* ── Password match feedback ─────────────────────────── */
+.aprof-match {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 0.8rem; font-weight: 500;
+  margin-top: 4px;
+}
+.aprof-match.ok { color: #10b981; }
+.aprof-match.err { color: #ef4444; }
+
+/* ── Divider with label ──────────────────────────────── */
+.aprof-divider-line {
+  display: flex; align-items: center; gap: 12px;
+  color: #475569; font-size: 0.8rem; font-weight: 600;
+  letter-spacing: 0.05em; text-transform: uppercase;
+}
+.aprof-divider-line::before,
+.aprof-divider-line::after {
+  content: ''; flex: 1; height: 1px;
+  background: rgba(255,255,255,0.06);
+}
+
+/* ── Alert error ─────────────────────────────────────── */
+.aprof-alert-error {
+  background: rgba(239,68,68,0.1);
+  border: 1px solid rgba(239,68,68,0.2);
+  color: #fca5a5;
+  padding: 0.9rem 1rem;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  display: flex; align-items: center; gap: 8px;
+}
+
+/* ── Form foot ───────────────────────────────────────── */
+.aprof-form-foot {
+  display: flex; justify-content: flex-end;
+  padding-top: 0.5rem;
+}
+
+/* ── Primary button ──────────────────────────────────── */
+.aprof-btn-primary {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: linear-gradient(135deg, #3b82f6, #0ea5e9);
+  color: #fff;
+  border: none;
+  padding: 0.8rem 2rem;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 16px rgba(59,130,246,0.3);
+}
+.aprof-btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(59,130,246,0.4);
+}
+.aprof-btn-primary:disabled {
+  background: #334155;
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* ── Spinner ─────────────────────────────────────────── */
+.aprof-spinner {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.25);
+  border-top-color: #fff;
+  animation: spin 0.7s linear infinite;
+  display: inline-block;
+}
+
+/* ══════════════════════════════════════════════════════════
+   RESPONSIVE
+══════════════════════════════════════════════════════════ */
+@media (max-width: 900px) {
+  .aprof-header-profile {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .aprof-logout-btn {
+    align-self: flex-start;
+  }
+}
+
+@media (max-width: 680px) {
+  .aprof-header-profile-left {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .aprof-card { padding: 1.5rem; }
+
+  .aprof-form-grid { grid-template-columns: 1fr; }
+
+  .aprof-tab-row { width: 100%; }
+  .aprof-tab { flex: 1; justify-content: center; }
+
+  .aprof-btn-primary { width: 100%; justify-content: center; }
+  .aprof-form-foot { justify-content: stretch; }
+}

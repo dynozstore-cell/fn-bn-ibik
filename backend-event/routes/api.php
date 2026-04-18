@@ -12,6 +12,7 @@ use App\Http\Controllers\KategoriController;
 use App\Http\Controllers\BeritaController;
 use App\Http\Controllers\KategoriBeritaController;
 use App\Http\Controllers\OTPController;
+use App\Http\Controllers\AdminDashboardController;
 
 /*
 |--------------------------------------------------------------------------
@@ -33,6 +34,9 @@ Route::post('/otp/resend',  [OTPController::class, 'resend']);
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout',  [AuthController::class, 'logout']);
     Route::get('/me',       [AuthController::class, 'me']);
+    
+    // Admin Dashboard
+    Route::get('/admin/dashboard-stats', [AdminDashboardController::class, 'index']);
 });
 
 // ─── Event Routes ──────────────────────────────────────────────────────────

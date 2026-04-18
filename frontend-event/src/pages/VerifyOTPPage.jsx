@@ -78,7 +78,13 @@ const VerifyOTPPage = () => {
         }
         setSuccess('Verifikasi berhasil! Anda telah masuk. Mengalihkan ke beranda...');
         setIsVisible(false);
-        setTimeout(() => navigate('/'), 600);
+        setTimeout(() => {
+          if (data.data?.role === 'admin') {
+            navigate('/admin/dashboard');
+          } else {
+            navigate('/');
+          }
+        }, 600);
       } else {
         setError(data.message || 'Verifikasi gagal');
       }
