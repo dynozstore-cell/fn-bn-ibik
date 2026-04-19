@@ -128,6 +128,7 @@ class AuthController extends Controller
             'data'    => [
                 'id_user'            => $user->id_user,
                 'nama_lengkap'       => $user->nama_lengkap,
+                'username'           => $user->username,
                 'email'              => $user->email,
                 'no_hp'              => $user->no_hp,
                 'kategori_pendaftar' => $user->kategori_pendaftar,
@@ -161,6 +162,7 @@ class AuthController extends Controller
             'data' => [
                 'id_user'            => $user->id_user,
                 'nama_lengkap'       => $user->nama_lengkap,
+                'username'           => $user->username,
                 'email'              => $user->email,
                 'no_hp'              => $user->no_hp,
                 'kategori_pendaftar' => $user->kategori_pendaftar,
@@ -296,6 +298,103 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'Password berhasil direset! Silakan login dengan password baru Anda.',
+        ]);
+    }
+
+    /**
+     * Update Profile User
+     */
+    public function updateProfile(Request $request)
+    {
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'nama_lengkap'       => ['required', 'string', 'max:255'],
+            'no_hp'              => ['nullable', 'string', 'max:15'],
+        ], [
+            'nama_lengkap.required' => 'Nama lengkap wajib diisi',
+        ]);
+
+        $user->update([
+            'nama_lengkap' => $validated['nama_lengkap'],
+            'no_hp'        => $validated['no_hp'],
+        ]);
+
+        return response()->json([
+            'message' => 'Profil berhasil diperbarui',
+            'data'    => $user,
+        ]);
+    }
+
+    /**
+     * Update Password User
+     */
+    public function updatePassword(Request $request)
+    {
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'current_password' => ['required', 'string'],
+            'new_password'     => [
+                'required',
+                'string',
+                'confirmed',
+                Password::min(8)
+                    ->mixedCase()
+                    ->numbers()
+                    ->symbols(),
+            ],
+        ], [
+            'current_password.required' => 'Password saat ini wajib diisi',
+            'new_password.required'     => 'Password baru wajib diisi',
+            'new_password.confirmed'    => 'Konfirmasi password baru tidak cocok',
+            'new_password.min'          => 'Password baru minimal 8 karakter',
+            'new_password.mixed_case'   => 'Password harus mengandung huruf besar dan kecil',
+            'new_password.numbers'      => 'Password harus mengandung angka',
+            'new_password.symbols'      => 'Password harus mengandung simbol',
+        ]);
+
+        if (!Hash::check($validated['current_password'], $user->password)) {
+            return response()->json([
+                'message' => 'Password saat ini tidak sesuai',
+            ], 400);
+        }
+
+        $user->update([
+            'password' => Hash::make($validated['new_password']),
+        ]);
+
+        return response()->json([
+            'message' => 'Password berhasil diperbarui',
+        ]);
+    }
+
+    /**
+     * Delete Account User
+     */
+    public function deleteAccount(Request $request)
+    {
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'password' => ['required', 'string'],
+        ], [
+            'password.required' => 'Password wajib diisi untuk konfirmasi',
+        ]);
+
+        if (!Hash::check($validated['password'], $user->password)) {
+            return response()->json([
+                'message' => 'Password tidak sesuai',
+            ], 400);
+        }
+
+        // Hapus semua token
+        $user->tokens()->delete();
+        // Hapus akun
+        $user->delete();
+
+        return response()->json([
+            'message' => 'Akun berhasil dihapus',
         ]);
     }
 }

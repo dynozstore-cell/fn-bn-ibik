@@ -1,23 +1,52 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Search, Trash2, Download, User, Mail, Phone, Shield, ChevronLeft, ChevronRight } from 'lucide-react';
+import { buildApiUrl, defaultHeaders } from '../utils/api';
+import { getToken } from '../utils/auth';
 import '../styles/AdminPenggunaPage.css';
 
-// --- Mock Data Awal ---
-const initialData = [
-  { id: 1, nama_lengkap: 'Ahmad Faisal', email: 'ahmad@example.com', no_hp: '08123450001', role: 'peserta', tanggal_daftar: '2023-02-15' },
-  { id: 2, nama_lengkap: 'Budi Santoso', email: 'budi@eventku.com', no_hp: '081234567890', role: 'penyelenggara', tanggal_daftar: '2023-01-15' },
-  { id: 3, nama_lengkap: 'Rina Melati', email: 'rina.m@example.com', no_hp: '08567890002', role: 'peserta', tanggal_daftar: '2023-06-20' },
-  { id: 4, nama_lengkap: 'Siti Aminah', email: 'siti.event@gmail.com', no_hp: '085678901234', role: 'penyelenggara', tanggal_daftar: '2023-05-22' },
-  { id: 5, nama_lengkap: 'Dewi Lestari', email: 'dewi.l@example.com', no_hp: '08112230003', role: 'peserta', tanggal_daftar: '2023-11-05' },
-  { id: 6, nama_lengkap: 'Komunitas IT Bandung', email: 'hello@kitb.org', no_hp: '081122334455', role: 'penyelenggara', tanggal_daftar: '2024-01-12' },
-  { id: 7, nama_lengkap: 'Admin Sistem', email: 'admin@eventhub.com', no_hp: '080000000000', role: 'admin', tanggal_daftar: '2022-12-01' },
-];
+// Helper: petakan field backend ke format tampilan
+const mapUser = (item) => ({
+  id: item.id_user ?? item.id,
+  nama_lengkap: item.nama_lengkap,
+  email: item.email,
+  no_hp: item.no_hp,
+  role: item.role,
+  tanggal_daftar: item.created_at ? item.created_at.substring(0, 10) : '',
+});
 
 export default function AdminPenggunaPage() {
-  const [data, setData] = useState(initialData);
+  const [data, setData] = useState([]);
+  const [dataLoading, setDataLoading] = useState(true);
+  const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [perPage, setPerPage] = useState(10);
   const [page, setPage] = useState(1);
+
+
+  const loadAllUsers = async () => {
+    setDataLoading(true);
+    setError('');
+    try {
+      const token = getToken() || '';
+      const headers = { ...defaultHeaders, Authorization: token ? `Bearer ${token}` : '' };
+      const res = await fetch(buildApiUrl('/api/admin/users'), { headers });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || 'Gagal memuat data pengguna.');
+      }
+      const result = await res.json();
+      const list = Array.isArray(result) ? result : result.data || [];
+      setData(list.map(mapUser));
+    } catch (err) {
+      setError(err.message || 'Gagal memuat data pengguna.');
+    } finally {
+      setDataLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAllUsers();
+  }, []);
 
   // Filtered Data
   const filtered = useMemo(() => {
@@ -32,15 +61,28 @@ export default function AdminPenggunaPage() {
   const totalPages = perPage === 'all' ? 1 : Math.ceil(filtered.length / Number(perPage));
   const paginated = perPage === 'all' ? filtered : filtered.slice((page - 1) * Number(perPage), page * Number(perPage));
 
-
   // Handlers
-  const handleDelete = (id, role) => {
+  const handleDelete = async (id, role) => {
     if (role === 'admin') {
       alert('Aksi ditolak: Anda tidak dapat menghapus akun admin!');
       return;
     }
-    if (window.confirm('Yakin ingin menghapus pengguna ini secara permanen?')) {
-      setData(prev => prev.filter(item => item.id !== id));
+    if (!window.confirm('Yakin ingin menghapus pengguna ini secara permanen?')) return;
+    try {
+      const token = getToken() || '';
+      const headers = { ...defaultHeaders, Authorization: token ? `Bearer ${token}` : '' };
+      const res = await fetch(buildApiUrl(`/api/penyelenggara/${id}`), {
+        method: 'DELETE',
+        headers,
+      });
+      if (res.ok) {
+        await loadAllUsers();
+      } else {
+        const err = await res.json();
+        alert(err.message || 'Gagal menghapus pengguna.');
+      }
+    } catch {
+      alert('Terjadi kesalahan saat menghapus pengguna.');
     }
   };
 
@@ -89,7 +131,7 @@ export default function AdminPenggunaPage() {
       <div className="aup-header">
         <div>
           <h1 className="aup-title">Kelola Pengguna</h1>
-          <p className="aup-subtitle">Manajemen data seluruh pengguna aplikasi (Data Mockup UI)</p>
+          <p className="aup-subtitle">Manajemen data seluruh pengguna aplikasi</p>
         </div>
         <button className="aup-btn-export" onClick={exportToCSV}>
           <Download size={18} /> Export CSV
@@ -124,10 +166,15 @@ export default function AdminPenggunaPage() {
         </div>
 
 
-        <div className="aup-summary">
-          Menampilkan <strong>{paginated.length}</strong> dari <strong>{filtered.length}</strong> pengguna
-          {search && ' (terfilter)'}
-        </div>
+        {error && <div style={{ color: '#ef4444', padding: '0.75rem 1rem', marginBottom: '0.75rem', background: 'rgba(239,68,68,0.1)', borderRadius: '8px', fontSize: '0.875rem' }}>{error}</div>}
+        {dataLoading ? (
+          <div className="aup-summary">Memuat data pengguna...</div>
+        ) : (
+          <div className="aup-summary">
+            Menampilkan <strong>{paginated.length}</strong> dari <strong>{filtered.length}</strong> pengguna
+            {search && ' (terfilter)'}
+          </div>
+        )}
 
 
         {/* Table */}

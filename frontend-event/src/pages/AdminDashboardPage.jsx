@@ -10,33 +10,15 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
 import { buildApiUrl, defaultHeaders } from '../utils/api';
+import { getToken } from '../utils/auth';
 import '../styles/AdminDashboard.css';
 
-/* ── Mock fallback data (shown when API returns empty) ── */
-const MOCK_MONTHLY = [
-  { name: 'Jan', event: 3, peserta: 42 },
-  { name: 'Feb', event: 5, peserta: 78 },
-  { name: 'Mar', event: 4, peserta: 61 },
-  { name: 'Apr', event: 8, peserta: 130 },
-  { name: 'Mei', event: 6, peserta: 95 },
-  { name: 'Jun', event: 11, peserta: 174 },
-  { name: 'Jul', event: 9, peserta: 142 },
-  { name: 'Agu', event: 13, peserta: 198 },
-  { name: 'Sep', event: 10, peserta: 161 },
-  { name: 'Okt', event: 15, peserta: 230 },
-  { name: 'Nov', event: 12, peserta: 187 },
-  { name: 'Des', event: 18, peserta: 274 },
-];
-
-const MOCK_CATEGORY = [
-  { name: 'Musik', value: 35 },
-  { name: 'Teknologi', value: 28 },
-  { name: 'Workshop', value: 20 },
-  { name: 'Bisnis', value: 12 },
-  { name: 'Olahraga', value: 5 },
-];
 
 const PIE_COLORS = ['#7c3aed', '#0ea5e9', '#10b981', '#f59e0b', '#f43f5e'];
+
+// 12 bulan pendek untuk label chart
+const BULAN_LABELS = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+
 
 const QUICK_LINKS = [
   { label: 'Kelola Event', to: '/admin/events', icon: <Calendar size={20} />, color: '#7c3aed' },
@@ -91,19 +73,26 @@ export default function AdminDashboardPage() {
     events_per_month: [],
     participants_per_month: [],
   });
+  const [categoryData, setCategoryData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [chartView, setChartView] = useState('combined'); // 'combined' | 'event' | 'peserta'
 
-  useEffect(() => { fetchStats(); }, []);
+  useEffect(() => {
+    fetchStats();
+    fetchCategoryData();
+  }, []);
 
   const fetchStats = async () => {
     setLoading(true);
     try {
+      const token = getToken() || '';
       const res = await fetch(buildApiUrl('/api/admin/dashboard-stats'), {
-        headers: { ...defaultHeaders, Authorization: `Bearer ${localStorage.getItem('token')}` },
+        headers: { ...defaultHeaders, Authorization: `Bearer ${token}` },
       });
-      const data = await res.json();
-      if (data.status === 'success') setStats(data.data);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.status === 'success') setStats(data.data);
+      }
     } catch (e) {
       console.error('Failed to fetch stats', e);
     } finally {
@@ -111,20 +100,46 @@ export default function AdminDashboardPage() {
     }
   };
 
-  /* Merge event + participant data into one array for combined chart */
-  const combinedData = (() => {
-    const base = stats.events_per_month.length > 0 ? stats.events_per_month : MOCK_MONTHLY;
-    const partMap = {};
-    const partSrc = stats.participants_per_month.length > 0 ? stats.participants_per_month : MOCK_MONTHLY;
-    partSrc.forEach(p => { partMap[p.name] = p.total ?? p.peserta ?? 0; });
-    return base.map(e => ({
-      name: e.name,
-      event: e.total ?? e.event ?? 0,
-      peserta: partMap[e.name] ?? 0,
-    }));
-  })();
+  // Fetch event data untuk distribusi kategori pie chart
+  const fetchCategoryData = async () => {
+    try {
+      const res = await fetch(buildApiUrl('/api/event'), {
+        headers: { ...defaultHeaders },
+      });
+      const events = await res.json();
+      const list = Array.isArray(events) ? events : events.data || [];
+      // Hitung distribusi kategori
+      const map = {};
+      list.forEach(ev => {
+        const kat = ev.category || ev.kategori?.nama_kategori || 'Lainnya';
+        map[kat] = (map[kat] || 0) + 1;
+      });
+      const pie = Object.entries(map).map(([name, value]) => ({ name, value }));
+      setCategoryData(pie);
+    } catch (e) {
+      console.error('Failed to fetch events for category chart', e);
+    }
+  };
 
-  const categoryData = MOCK_CATEGORY;
+  /* Bangun 12 bulan penuh untuk tahun berjalan, isi 0 jika tidak ada data */
+  const currentYear = new Date().getFullYear();
+  const combinedData = BULAN_LABELS.map((label, i) => {
+    const monthStr = String(i + 1).padStart(2, '0');
+    // Cari data event bulan ini — backend mengirim name: 'Jan YYYY' atau 'YYYY-MM'
+    const eventEntry = stats.events_per_month.find(e => {
+      const n = e.name || '';
+      return n.startsWith(label) || n.includes(`${currentYear}-${monthStr}`);
+    });
+    const pesertaEntry = stats.participants_per_month.find(p => {
+      const n = p.name || '';
+      return n.startsWith(label) || n.includes(`${currentYear}-${monthStr}`);
+    });
+    return {
+      name: label,
+      event: eventEntry ? (eventEntry.total ?? eventEntry.event ?? 0) : 0,
+      peserta: pesertaEntry ? (pesertaEntry.total ?? pesertaEntry.peserta ?? 0) : 0,
+    };
+  });
 
   const exportToCSV = () => {
     const rows = [
@@ -264,35 +279,44 @@ export default function AdminDashboardPage() {
             </div>
           </div>
           <div className="adash-chart-area">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={categoryData}
-                  cx="50%" cy="45%"
-                  innerRadius="40%" outerRadius="70%"
-                  paddingAngle={3}
-                  dataKey="value"
-                  labelLine={false}
-                  label={PieLabel}
-                >
-                  {categoryData.map((_, i) => (
-                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{ background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8 }}
-                  itemStyle={{ color: '#e2e8f0' }}
-                  labelStyle={{ color: '#f8fafc', fontWeight: 700 }}
-                />
-                <Legend
-                  iconType="circle"
-                  iconSize={9}
-                  wrapperStyle={{ fontSize: '0.82rem', color: '#94a3b8', paddingTop: '0.5rem' }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+            {loading ? (
+              <div className="adash-chart-empty"><Skeleton h={200} r={10} /></div>
+            ) : categoryData.length === 0 ? (
+              <div className="adash-chart-empty" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '0.9rem' }}>
+                Belum ada data event
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={categoryData}
+                    cx="50%" cy="45%"
+                    innerRadius="40%" outerRadius="70%"
+                    paddingAngle={3}
+                    dataKey="value"
+                    labelLine={false}
+                    label={PieLabel}
+                  >
+                    {categoryData.map((_, i) => (
+                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8 }}
+                    itemStyle={{ color: '#e2e8f0' }}
+                    labelStyle={{ color: '#f8fafc', fontWeight: 700 }}
+                  />
+                  <Legend
+                    iconType="circle"
+                    iconSize={9}
+                    wrapperStyle={{ fontSize: '0.82rem', color: '#94a3b8', paddingTop: '0.5rem' }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
+
 
       </div>
 

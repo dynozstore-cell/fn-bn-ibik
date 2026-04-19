@@ -5,33 +5,50 @@ import {
 } from 'recharts';
 import {
   Search, Filter, Trash2, Edit, ChevronLeft, ChevronRight,
-  ShieldCheck, User, Mail, Phone, Calendar, CheckCircle, XCircle, Plus
+  ShieldCheck, User, Mail, Phone, Calendar, CheckCircle, XCircle, Plus, Eye, EyeOff
 } from 'lucide-react';
+import { buildApiUrl, defaultHeaders } from '../utils/api';
+import { getToken } from '../utils/auth';
 import '../styles/AdminPenyelenggaraPage.css';
 
-// --- Mock Data Awal ---
-const initialData = [
-  { id: 1, nama_lengkap: 'Budi Santoso', email: 'budi@eventku.com', no_hp: '081234567890', kategori_pendaftar: 'Individu', status: 'aktif', tanggal_bergabung: '2023-01-15' },
-  { id: 2, nama_lengkap: 'PT Maju Bersama', email: 'info@majubersama.co.id', no_hp: '082111222333', kategori_pendaftar: 'Institusi', status: 'aktif', tanggal_bergabung: '2023-03-10' },
-  { id: 3, nama_lengkap: 'Siti Aminah', email: 'siti.event@gmail.com', no_hp: '085678901234', kategori_pendaftar: 'Individu', status: 'nonaktif', tanggal_bergabung: '2023-05-22' },
-  { id: 4, nama_lengkap: 'Universitas Terbuka', email: 'event@ut.ac.id', no_hp: '02198765432', kategori_pendaftar: 'Institusi', status: 'aktif', tanggal_bergabung: '2023-08-05' },
-  { id: 5, nama_lengkap: 'Komunitas IT Bandung', email: 'hello@kitb.org', no_hp: '081122334455', kategori_pendaftar: 'Komunitas', status: 'aktif', tanggal_bergabung: '2024-01-12' },
-  { id: 6, nama_lengkap: 'Andi Pratama', email: 'andi.p@yahoo.com', no_hp: '087766554433', kategori_pendaftar: 'Individu', status: 'aktif', tanggal_bergabung: '2024-02-18' },
-  { id: 7, nama_lengkap: 'Event Organizer JKT', email: 'contact@eojkt.com', no_hp: '02133344455', kategori_pendaftar: 'Institusi', status: 'nonaktif', tanggal_bergabung: '2024-04-01' },
+// Kategori penyelenggara sesuai validasi backend
+const KATEGORI_PENYELENGGARA = [
+  'Unit Kerja',
+  'Mahasiswa',
+  'Komunitas',
 ];
+
+// Helper: petakan data backend ke format tampilan
+const mapPenyelenggara = (item) => ({
+  id: item.id_user ?? item.id,
+  nama_lengkap: item.nama_lengkap,
+  email: item.email,
+  no_hp: item.no_hp,
+  kategori_pendaftar: item.kategori_pendaftar,
+  // status: aktif jika email_verified_at terisi, nonaktif jika null
+  status: item.email_verified_at ? 'aktif' : 'nonaktif',
+  // tanggal bergabung dari created_at
+  tanggal_bergabung: item.created_at
+    ? item.created_at.substring(0, 10)
+    : '',
+});
 
 const BULAN = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agt','Sep','Okt','Nov','Des'];
 const PIE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444'];
 
 export default function AdminPenyelenggaraPage() {
-  const [data, setData] = useState(initialData);
-  
+  const [data, setData] = useState([]);
+  const [dataLoading, setDataLoading] = useState(true);
+
   // States for Modal/Form
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState(null);
   const [formData, setFormData] = useState({
-    nama_lengkap: '', email: '', no_hp: '', kategori_pendaftar: 'Individu', status: 'aktif'
+    nama_lengkap: '', email: '', no_hp: '', kategori_pendaftar: KATEGORI_PENYELENGGARA[0], status: 'aktif', password: ''
   });
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   // Filter & Pagination
   const [search, setSearch] = useState('');
@@ -40,15 +57,37 @@ export default function AdminPenyelenggaraPage() {
   const [perPage, setPerPage] = useState(10);
   const [page, setPage] = useState(1);
 
-  // Chart
+  // Chart year state
   const [chartYear, setChartYear] = useState(new Date().getFullYear());
 
-  // Available Categories
-  const kategoriList = useMemo(() => {
-    return [...new Set(data.map(d => d.kategori_pendaftar))].sort();
-  }, [data]);
+  const token = getToken() || '';
+  const authHeaders = { ...defaultHeaders, Authorization: token ? `Bearer ${token}` : '' };
 
-  // Available Years
+  // Fetch data penyelenggara dari backend
+  const loadPenyelenggara = async () => {
+    setDataLoading(true);
+    setError('');
+    try {
+      const res = await fetch(buildApiUrl('/api/penyelenggara'), { headers: authHeaders });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || 'Gagal memuat data penyelenggara.');
+      }
+      const result = await res.json();
+      const list = Array.isArray(result) ? result : result.data || [];
+      setData(list.map(mapPenyelenggara));
+    } catch (err) {
+      setError(err.message || 'Terjadi kesalahan saat memuat data.');
+    } finally {
+      setDataLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadPenyelenggara();
+  }, []);
+
+  // Available Years (dari data yang sudah dimuat)
   const years = useMemo(() => {
     const ys = data.map(d => new Date(d.tanggal_bergabung).getFullYear()).filter(y => !isNaN(y));
     return [...new Set(ys)].sort((a, b) => b - a);
@@ -89,24 +128,57 @@ export default function AdminPenyelenggaraPage() {
   }, [data]);
 
   // Handlers
-  const handleDelete = (id) => {
-    if (window.confirm('Yakin ingin menghapus penyelenggara ini?')) {
-      setData(prev => prev.filter(item => item.id !== id));
+  const handleDelete = async (id) => {
+    if (!window.confirm('Yakin ingin menghapus penyelenggara ini?')) return;
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch(buildApiUrl(`/api/penyelenggara/${id}`), {
+        method: 'DELETE',
+        headers: authHeaders,
+      });
+      const response = await res.json();
+      if (!res.ok) {
+        throw new Error(response.message || 'Gagal menghapus penyelenggara.');
+      }
+      await loadPenyelenggara();
+    } catch (err) {
+      setError(err.message || 'Terjadi kesalahan saat menghapus.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleToggleStatus = (id) => {
-    setData(prev => prev.map(item => {
-      if (item.id === id) {
-        return { ...item, status: item.status === 'aktif' ? 'nonaktif' : 'aktif' };
+  const handleToggleStatus = async (id) => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch(buildApiUrl(`/api/penyelenggara/${id}/toggle-status`), {
+        method: 'PUT',
+        headers: authHeaders,
+      });
+      const response = await res.json();
+      if (!res.ok) {
+        throw new Error(response.message || 'Gagal mengubah status.');
       }
-      return item;
-    }));
+      await loadPenyelenggara();
+    } catch (err) {
+      setError(err.message || 'Terjadi kesalahan saat mengubah status.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const openAddModal = () => {
     setEditId(null);
-    setFormData({ nama_lengkap: '', email: '', no_hp: '', kategori_pendaftar: 'Individu', status: 'aktif' });
+    setFormData({
+      nama_lengkap: '',
+      email: '',
+      no_hp: '',
+      kategori_pendaftar: KATEGORI_PENYELENGGARA[0],
+      status: 'aktif',
+      password: ''
+    });
     setShowModal(true);
   };
 
@@ -117,20 +189,48 @@ export default function AdminPenyelenggaraPage() {
       email: item.email,
       no_hp: item.no_hp,
       kategori_pendaftar: item.kategori_pendaftar,
-      status: item.status
+      status: item.status,
+      password: '',
     });
     setShowModal(true);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (editId) {
-      setData(prev => prev.map(item => item.id === editId ? { ...item, ...formData } : item));
-    } else {
-      const newId = data.length > 0 ? Math.max(...data.map(d => d.id)) + 1 : 1;
-      setData(prev => [...prev, { ...formData, id: newId, tanggal_bergabung: new Date().toISOString().split('T')[0] }]);
+    setLoading(true);
+    setError('');
+    try {
+      const payload = {
+        nama_lengkap: formData.nama_lengkap,
+        email: formData.email,
+        no_hp: formData.no_hp,
+        kategori_pendaftar: formData.kategori_pendaftar,
+        status: formData.status,
+        ...(formData.password ? { password: formData.password } : {}),
+      };
+
+      const url = editId ? buildApiUrl(`/api/penyelenggara/${editId}`) : buildApiUrl('/api/penyelenggara');
+      const method = editId ? 'PUT' : 'POST';
+      const res = await fetch(url, {
+        method,
+        headers: authHeaders,
+        body: JSON.stringify(payload),
+      });
+      const response = await res.json();
+      if (!res.ok) {
+        if (response.errors) {
+          const firstError = Object.values(response.errors)[0][0];
+          throw new Error(firstError);
+        }
+        throw new Error(response.message || 'Gagal menyimpan penyelenggara.');
+      }
+      await loadPenyelenggara();
+      setShowModal(false);
+    } catch (err) {
+      setError(err.message || 'Terjadi kesalahan saat menyimpan penyelenggara.');
+    } finally {
+      setLoading(false);
     }
-    setShowModal(false);
   };
 
   // Components
@@ -161,7 +261,7 @@ export default function AdminPenyelenggaraPage() {
       <div className="apg-header">
         <div>
           <h1 className="apg-title">Kelola Penyelenggara</h1>
-          <p className="apg-subtitle">Manajemen akun penyelenggara event (Data Mockup UI)</p>
+          <p className="apg-subtitle">Manajemen akun penyelenggara event</p>
         </div>
         <button className="apg-btn-add" onClick={openAddModal}>
           <Plus size={18} /> Tambah Penyelenggara
@@ -274,7 +374,9 @@ export default function AdminPenyelenggaraPage() {
                 onChange={e => { setFilterKategori(e.target.value); setPage(1); }}
               >
                 <option value="">Semua Kategori</option>
-                {kategoriList.map(k => <option key={k} value={k}>{k}</option>)}
+                {KATEGORI_PENYELENGGARA.map(kat => (
+                  <option key={kat} value={kat}>{kat}</option>
+                ))}
               </select>
             </div>
             <div className="apg-filter-wrap">
@@ -304,9 +406,14 @@ export default function AdminPenyelenggaraPage() {
         </div>
 
         {/* Summary */}
-        <div className="apg-summary">
-          Menampilkan <strong>{paginated.length}</strong> dari <strong>{filtered.length}</strong> penyelenggara
-        </div>
+        {error && <div className="apg-error-message">{error}</div>}
+        {dataLoading ? (
+          <div className="apg-summary">Memuat data penyelenggara...</div>
+        ) : (
+          <div className="apg-summary">
+            Menampilkan <strong>{paginated.length}</strong> dari <strong>{filtered.length}</strong> penyelenggara
+          </div>
+        )}
 
         {/* Table */}
         <div className="apg-table-wrap">
@@ -405,22 +512,33 @@ export default function AdminPenyelenggaraPage() {
                 <label>Nomor HP</label>
                 <input required value={formData.no_hp} onChange={e => setFormData({...formData, no_hp: e.target.value})} />
               </div>
-              <div className="apg-form-row">
-                <div className="apg-form-group">
-                  <label>Kategori</label>
-                  <select value={formData.kategori_pendaftar} onChange={e => setFormData({...formData, kategori_pendaftar: e.target.value})}>
-                    <option value="Individu">Individu</option>
-                    <option value="Institusi">Institusi</option>
-                    <option value="Komunitas">Komunitas</option>
-                  </select>
+              <div className="apg-form-group">
+                <label>Password {editId ? '(biarkan kosong jika tidak diubah)' : ''}</label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    required={!editId}
+                    value={formData.password}
+                    onChange={e => setFormData({...formData, password: e.target.value})}
+                    style={{ paddingRight: '40px', width: '100%' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 0 }}
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
                 </div>
-                <div className="apg-form-group">
-                  <label>Status</label>
-                  <select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}>
-                    <option value="aktif">Aktif</option>
-                    <option value="nonaktif">Nonaktif</option>
-                  </select>
-                </div>
+              </div>
+              <div className="apg-form-group">
+                <label>Kategori</label>
+                <select value={formData.kategori_pendaftar} onChange={e => setFormData({...formData, kategori_pendaftar: e.target.value})}>
+                  <option value="" disabled>Pilih kategori</option>
+                  {KATEGORI_PENYELENGGARA.map(kat => (
+                    <option key={kat} value={kat}>{kat}</option>
+                  ))}
+                </select>
               </div>
               <div className="apg-modal-footer">
                 <button type="button" className="apg-btn-cancel" onClick={() => setShowModal(false)}>Batal</button>

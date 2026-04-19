@@ -33,6 +33,12 @@
   -webkit-font-smoothing: antialiased;
 }
 
+.ep-page .container {
+  max-width: 1400px;
+  width: 92%;
+  margin: 0 auto;
+}
+
 .ep-main {
   flex: 1;
   padding-top: 70px;
@@ -345,7 +351,7 @@
 /* Image poster — compact */
 .ep-card-img-wrap {
   position: relative;
-  height: 140px;
+  height: 180px;
   overflow: hidden;
   background: linear-gradient(135deg, #6d28d9, #a855f7);
   flex-shrink: 0;
@@ -389,16 +395,16 @@
 
 /* Card body */
 .ep-card-body {
-  padding: 14px 15px;
+  padding: 18px 20px;
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .ep-card-title {
-  font-size: 0.9rem;
-  font-weight: 600;
+  font-size: 1.05rem;
+  font-weight: 700;
   color: var(--ep-white);
   line-height: 1.4;
   display: -webkit-box;
@@ -409,7 +415,7 @@
 }
 
 .ep-card-desc {
-  font-size: 0.78rem;
+  font-size: 0.85rem;
   color: var(--ep-white-soft);
   line-height: 1.55;
   display: -webkit-box;
@@ -434,7 +440,7 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   color: var(--ep-white-soft);
   white-space: nowrap;
   overflow: hidden;
@@ -455,9 +461,9 @@
 }
 
 .ep-btn {
-  padding: 8px 12px;
+  padding: 10px 14px;
   border-radius: 8px;
-  font-size: 0.78rem;
+  font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;

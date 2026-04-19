@@ -4,6 +4,7 @@ import {
   User, Mail, Phone, Shield, Key, LogOut, Camera, Save,
   CheckCircle, Eye, EyeOff, Lock, AlertCircle, Edit3, Info
 } from 'lucide-react';
+import { getUser, clearAuth, setAuth, getToken } from '../utils/auth';
 import '../styles/AdminProfilePage.css';
 
 /* ── Password strength helper ─────────────────────────── */
@@ -87,16 +88,14 @@ export default function AdminProfilePage() {
   const strength = getPasswordStrength(passwordData.newPassword);
 
   useEffect(() => {
-    try {
-      const u = JSON.parse(localStorage.getItem('user') || '{}');
-      if (u.name || u.email) {
-        setProfileData(prev => ({
-          ...prev,
-          name: u.name || prev.name,
-          email: u.email || prev.email,
-        }));
-      }
-    } catch (_) {}
+    const u = getUser();
+    if (u) {
+      setProfileData(prev => ({
+        ...prev,
+        name: u.nama_lengkap || u.name || prev.name,
+        email: u.email || prev.email,
+      }));
+    }
   }, []);
 
   /* ─── Handlers ──────────────────────────────────────── */
@@ -124,8 +123,9 @@ export default function AdminProfilePage() {
     e.preventDefault();
     setIsSaving(true);
     setTimeout(() => {
-      const u = JSON.parse(localStorage.getItem('user') || '{}');
-      localStorage.setItem('user', JSON.stringify({ ...u, name: profileData.name, email: profileData.email }));
+      const u = getUser() || {};
+      const updatedUser = { ...u, name: profileData.name, email: profileData.email };
+      setAuth(getToken(), updatedUser);
       setIsSaving(false);
       setEdited(false);
       toast();
@@ -151,8 +151,7 @@ export default function AdminProfilePage() {
 
   const handleLogout = () => {
     if (window.confirm('Yakin ingin keluar dari sesi admin?')) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+      clearAuth();
       navigate('/login');
     }
   };

@@ -311,6 +311,41 @@
 }
 
 /* ════════════════════════════════════════════════════════
+   SELECT & DROPDOWN STYLING
+════════════════════════════════════════════════════════ */
+select {
+  box-sizing: border-box;
+}
+
+select:focus {
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 3px rgba(124,58,237,0.14);
+}
+
+select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+select option {
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 10px 8px;
+  margin: 0;
+  border: 0;
+}
+
+select option:hover {
+  background: #334155;
+  color: #fff;
+}
+
+select option:checked {
+  background: #7c3aed;
+  color: #fff;
+}
+
+/* ════════════════════════════════════════════════════════
    RESPONSIVE
 ════════════════════════════════════════════════════════ */
 @media (max-width: 1200px) {

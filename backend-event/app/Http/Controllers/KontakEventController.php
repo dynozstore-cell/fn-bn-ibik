@@ -57,5 +57,24 @@ class KontakEventController extends Controller
         'message' => 'Data berhasil diupdate',
         'data' => $kontak
     ],200);
+    }
+
+    // admin hapus pesan
+    public function destroy($id)
+    {
+        $kontak = KontakEvent::find($id);
+
+        if(!$kontak){
+            return response()->json([
+                'message' => 'Data tidak ditemukan'
+            ],404);
+        }
+
+        $kontak->delete();
+
+        return response()->json([
+            'message' => 'Data berhasil dihapus'
+        ],200);
+    }
 }
-}
+

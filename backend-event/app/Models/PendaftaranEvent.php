@@ -14,8 +14,15 @@ class PendaftaranEvent extends Model
     protected $fillable = [
         'user_id',
         'event_id',
+        'jumlah_tiket',
+        'total_harga',
         'tanggal_daftar',
-        'status_pendaftaran'
+        'status_pendaftaran',
+        'custom_form_responses'
+    ];
+
+    protected $casts = [
+        'custom_form_responses' => 'array',
     ];
 
     public function user()

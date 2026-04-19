@@ -1,43 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Search, Mail, MailOpen, Trash2, Reply,
   ArrowLeft, Clock, InboxIcon
 } from 'lucide-react';
+import { buildApiUrl, defaultHeaders } from '../utils/api';
+import { getToken } from '../utils/auth';
 import '../styles/AdminPesanPage.css';
-
-/* ─── Mock Data ──────────────────────────────────────────── */
-const initialData = [
-  {
-    id: 1, pengirim: 'Budi Santoso', email: 'budi@example.com',
-    subjek: 'Pertanyaan tentang Event Startup',
-    isi: 'Halo Admin,\n\nSaya ingin bertanya apakah pendaftaran untuk event Startup Digital masih dibuka? Teman saya juga ingin ikut, apakah ada diskon rombongan?\n\nTerima kasih,\nBudi',
-    tanggal: '2024-04-10T10:30:00', isRead: false,
-  },
-  {
-    id: 2, pengirim: 'Rina Melati', email: 'rina.m@example.com',
-    subjek: 'Kendala Pembayaran Tiket',
-    isi: 'Selamat siang,\n\nSaya mengalami kendala saat melakukan pembayaran tiket untuk Tech Conference. Transfer bank saya selalu gagal dan muncul pesan error koneksi.\n\nMohon bantuannya segera karena tiket hampir habis.',
-    tanggal: '2024-04-09T14:15:00', isRead: false,
-  },
-  {
-    id: 3, pengirim: 'PT Maju Bersama', email: 'info@majubersama.co.id',
-    subjek: 'Proposal Kerja Sama Sponsorship',
-    isi: 'Dengan hormat,\n\nKami dari PT Maju Bersama bermaksud mengajukan proposal kerja sama sponsorship untuk event berskala nasional yang akan Anda adakan bulan depan.\n\nMohon info kontak divisi Partnership.\n\nSalam,\nTim Marketing',
-    tanggal: '2024-04-08T09:00:00', isRead: true,
-  },
-  {
-    id: 4, pengirim: 'Ahmad Faisal', email: 'ahmad@example.com',
-    subjek: 'Sertifikat Belum Diterima',
-    isi: 'Min, saya belum menerima e-sertifikat untuk Workshop Fotografi yang diadakan minggu lalu. Kapan kira-kira dikirimkan ya?\n\nTerima kasih.',
-    tanggal: '2024-04-05T16:45:00', isRead: true,
-  },
-  {
-    id: 5, pengirim: 'Siti Aminah', email: 'siti.event@gmail.com',
-    subjek: 'Ubah Jadwal Event',
-    isi: 'Mohon info prosedur untuk mengubah jadwal event yang sudah terlanjur di-publish. Ada kendala teknis dari pihak pembicara yang mengharuskan kami memundur jadwal selama 1 minggu.\n\nTerima kasih atas responsnya.',
-    tanggal: '2024-04-02T11:20:00', isRead: true,
-  },
-];
 
 /* ─── Helpers ────────────────────────────────────────────── */
 function getAvatarColor(name) {
@@ -71,10 +39,42 @@ function formatFullDate(dateString) {
    MAIN COMPONENT
 ════════════════════════════════════════════════════════ */
 export default function AdminPesanPage() {
-  const [messages, setMessages] = useState(initialData);
+  const [messages, setMessages] = useState([]);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all'); // all | unread | read
   const [selectedId, setSelectedId] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const token = getToken() || '';
+  const authHeaders = { ...defaultHeaders, Authorization: `Bearer ${token}` };
+
+  const loadMessages = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(buildApiUrl('/api/kontak-event'), { headers: authHeaders });
+      if (res.ok) {
+        const data = await res.json();
+        const mapped = data.map(k => ({
+          id: k.id,
+          pengirim: k.nama,
+          email: k.email,
+          subjek: k.judul_event || 'Pesan Umum',
+          isi: k.pesan || '',
+          tanggal: k.created_at,
+          isRead: k.status !== 'pending'
+        }));
+        setMessages(mapped);
+      }
+    } catch (e) {
+      console.error('Failed to load messages', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadMessages();
+  }, []);
 
   /* ── Derived ────────────────────────────────────────── */
   const unreadCount = messages.filter(m => !m.isRead).length;
@@ -97,21 +97,55 @@ export default function AdminPesanPage() {
   const selectedMessage = messages.find(m => m.id === selectedId);
 
   /* ── Handlers ───────────────────────────────────────── */
-  const handleSelectMessage = (id) => {
+  const handleSelectMessage = async (id) => {
     setSelectedId(id);
-    setMessages(prev => prev.map(msg => msg.id === id ? { ...msg, isRead: true } : msg));
+    const msg = messages.find(m => m.id === id);
+    if (msg && !msg.isRead) {
+      // Mark as read in backend
+      try {
+        await fetch(buildApiUrl(`/api/kontak-event/${id}`), {
+          method: 'PUT',
+          headers: authHeaders,
+          body: JSON.stringify({ ...msg, status: 'read' })
+        });
+        setMessages(prev => prev.map(m => m.id === id ? { ...m, isRead: true } : m));
+      } catch (e) { console.error('Failed to mark read', e); }
+    }
   };
 
-  const handleToggleRead = (e, id, currentStatus) => {
+  const handleToggleRead = async (e, id, currentStatus) => {
     e.stopPropagation();
-    setMessages(prev => prev.map(msg => msg.id === id ? { ...msg, isRead: !currentStatus } : msg));
+    const newStatus = currentStatus ? 'pending' : 'read';
+    try {
+      const msg = messages.find(m => m.id === id);
+      const res = await fetch(buildApiUrl(`/api/kontak-event/${id}`), {
+        method: 'PUT',
+        headers: authHeaders,
+        body: JSON.stringify({ ...msg, status: newStatus })
+      });
+      if (res.ok) {
+        setMessages(prev => prev.map(m => m.id === id ? { ...m, isRead: !currentStatus } : m));
+      }
+    } catch (e) { console.error('Failed to toggle read', e); }
   };
 
-  const handleDelete = (e, id) => {
+  const handleDelete = async (e, id) => {
     e.stopPropagation();
     if (window.confirm('Yakin ingin menghapus pesan ini?')) {
-      setMessages(prev => prev.filter(msg => msg.id !== id));
-      if (selectedId === id) setSelectedId(null);
+      try {
+        const res = await fetch(buildApiUrl(`/api/kontak-event/${id}`), {
+          method: 'DELETE',
+          headers: authHeaders
+        });
+        if (res.ok) {
+          setMessages(prev => prev.filter(msg => msg.id !== id));
+          if (selectedId === id) setSelectedId(null);
+        } else {
+          alert('Gagal menghapus pesan.');
+        }
+      } catch (err) {
+        alert('Terjadi kesalahan saat menghapus pesan.');
+      }
     }
   };
 
@@ -176,7 +210,12 @@ export default function AdminPesanPage() {
 
           {/* Message rows */}
           <div className="apm-msg-list">
-            {filteredMessages.length === 0 ? (
+            {loading ? (
+              <div className="apm-empty">
+                <div className="apm-empty-icon" style={{ opacity: 0.5 }}><InboxIcon size={36} /></div>
+                <h3>Memuat Pesan...</h3>
+              </div>
+            ) : filteredMessages.length === 0 ? (
               <div className="apm-empty">
                 <div className="apm-empty-icon"><InboxIcon size={36} /></div>
                 <h3>Tidak Ada Pesan</h3>

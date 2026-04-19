@@ -16,10 +16,10 @@ function normalizeEvent(event) {
     date: event.date || event.tanggal || "-",
     location: event.location || event.lokasi || "-",
     category: event.category || event.kategori?.nama_kategori || "Event",
-    organizer: event.organizer || "Panitia Event",
+    organizer: event.penyelenggara_name || event.organizer || "Panitia Event",
     description: event.description || event.deskripsi || "Deskripsi belum tersedia.",
     harga: event.harga ?? null,
-    buttonLabel: event.buttonLabel || "Beli Tiket",
+    buttonLabel: event.buttonLabel || "Detail Event",
     foto_event_url: event.foto_event_url || (event.foto_event ? buildApiUrl(`/event/${event.foto_event}`) : FALLBACK_IMAGE),
   };
 }
@@ -262,9 +262,9 @@ const EventsPage = () => {
                           <button
                             type="button"
                             className="ep-btn ep-btn-primary"
-                            onClick={() => navigate(`/events/${event.id}/ticket`)}
+                            onClick={() => navigate(`/events/${event.id}`)}
                           >
-                            Daftar Sekarang
+                            Detail Event
                           </button>
                         </div>
                       </div>

@@ -7,6 +7,7 @@ use App\Models\Event;
 use App\Models\User;
 use App\Models\PendaftaranEvent;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 
 class AdminDashboardController extends Controller
@@ -67,6 +68,51 @@ class AdminDashboardController extends Controller
                 'events_per_month' => $formattedEvents,
                 'participants_per_month' => $formattedParticipants
             ]
+        ], 200);
+    }
+
+    /**
+     * Mendapatkan semua user (semua role) untuk halaman Admin Pengguna
+     */
+    public function getAllUsers()
+    {
+        $users = User::orderBy('created_at', 'desc')->get();
+        return response()->json($users, 200);
+    }
+
+    /**
+     * Mendapatkan data laporan event dan penyelenggara
+     */
+    public function getLaporan()
+    {
+        $user = Auth::user();
+        $query = Event::with(['kategori', 'penyelenggara']);
+
+        if ($user && $user->role === 'penyelenggara') {
+            $query->where('user_id', $user->id_user);
+        }
+
+        $events = $query->get()->map(function ($ev) {
+            $pendaftar = PendaftaranEvent::where('event_id', $ev->id)->count();
+            // Karena tidak ada field kehadiran spesifik, kita asumsikan yang status_pendaftaran = 'success' adalah hadir. 
+            // Jika belum ada status success, kita beri nilai 0 atau simulasi (untuk sementara kita hitung yang statusnya success/hadir)
+            $hadir = PendaftaranEvent::where('event_id', $ev->id)
+                        ->whereIn('status_pendaftaran', ['success', 'hadir'])
+                        ->count();
+
+            return [
+                'id' => $ev->id,
+                'nama_event' => $ev->nama_event,
+                'penyelenggara' => optional($ev->penyelenggara)->nama_lengkap ?? 'Global Admin',
+                'tanggal' => Carbon::parse($ev->tanggal)->format('Y-m-d'),
+                'pendaftar' => $pendaftar,
+                'hadir' => $hadir
+            ];
+        });
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $events
         ], 200);
     }
 }

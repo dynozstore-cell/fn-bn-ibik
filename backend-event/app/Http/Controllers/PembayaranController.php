@@ -16,7 +16,15 @@ class PembayaranController extends Controller
         $pembayaran->nama_peserta = optional($user)->nama_lengkap;
         $pembayaran->email_peserta = optional($user)->email;
         $pembayaran->nama_event = optional($event)->nama_event;
-        $pembayaran->metode_pembayaran = optional($pembayaran->metodePembayaran)->nama_metode;
+        $pembayaran->nama_metode = optional($pembayaran->metodePembayaran)->nama_metode;
+        
+        // Tambahkan data dari pendaftaran
+        $pembayaran->custom_form_responses = optional($pendaftaran)->custom_form_responses;
+        $pembayaran->jumlah_tiket = optional($pendaftaran)->jumlah_tiket;
+        $pembayaran->total_harga_pendaftaran = optional($pendaftaran)->total_harga;
+        $pembayaran->tanggal_daftar = optional($pendaftaran)->tanggal_daftar;
+        $pembayaran->status_pendaftaran = optional($pendaftaran)->status_pendaftaran;
+
         if ($pembayaran->bukti_pembayaran) {
             $req = request();
             $base = rtrim($req->getSchemeAndHttpHost() . $req->getBasePath(), '/');
@@ -49,11 +57,22 @@ class PembayaranController extends Controller
     }
 
     // melihat semua pembayaran
-    public function index()
+    public function index(Request $request)
     {
-        $data = Pembayaran::with(['pendaftaran.user', 'pendaftaran.event', 'metodePembayaran'])->get()->map(function ($pembayaran) {
+        $user = $request->user();
+        $query = Pembayaran::with(['pendaftaran.user', 'pendaftaran.event', 'metodePembayaran']);
+
+        // Jika role adalah penyelenggara, filter hanya event miliknya
+        if ($user && $user->role === 'penyelenggara') {
+            $query->whereHas('pendaftaran.event', function ($q) use ($user) {
+                $q->where('user_id', $user->id_user);
+            });
+        }
+
+        $data = $query->orderBy('created_at', 'desc')->get()->map(function ($pembayaran) {
             return $this->transformPembayaran($pembayaran);
         });
+
         return response()->json($data);
     }
 

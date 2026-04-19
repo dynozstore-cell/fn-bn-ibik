@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Image as ImageIcon, Upload, FileText, Save, CheckCircle,
   LayoutTemplate, Plus, Trash2, Edit3, Eye, Calendar, Tag, Newspaper, Ticket, X
 } from 'lucide-react';
+import { buildApiUrl, defaultHeaders } from '../utils/api';
+import { getToken } from '../utils/auth';
 import '../styles/AdminPengaturanPage.css';
 
 /* ================================================================
-   DATA INITIAL — mirrors the static data in HomePage.jsx
-   (in real integration, these would come from an API)
+   DATA INITIAL — Banner dan Hero (Berita sekarang dari API)
 ================================================================ */
 const INIT_BANNER = [
   { id: 'b1', title: 'Neon Night Music Festival', subtitle: 'Pengalaman musik terbaik tahun ini', date: '22 MAR 2026', foto_event_url: '' },
@@ -22,12 +23,7 @@ const INIT_HERO_CARDS = [
   { id: 'h3', title: 'Career & Meditation', price: 'Gratis', handle: '@mindfulid', imageUrl: '' },
 ];
 
-const INIT_NEWS = [
-  { id: 'n1', title: '5 Tren Event Technology 2026', date: '31 Mar 2026', category: 'Technology', source: 'EventNews', excerpt: 'Teknologi event terus berkembang dengan inovasi-inovasi terbaru.', imageUrl: '' },
-  { id: 'n2', title: 'Panduan Memilih Event yang Tepat', date: '30 Mar 2026', category: 'Tips & Tricks', source: 'EventPlace Magazine', excerpt: 'Memilih event yang sesuai dengan minat dan kebutuhan penting untuk pengalaman terbaik.', imageUrl: '' },
-  { id: 'n3', title: 'Cerita Sukses: Peserta Event jadi Entrepreneur', date: '29 Mar 2026', category: 'Inspirasi', source: 'EventPlace Stories', excerpt: 'Temui kisah inspiratif dari peserta event yang berhasil mengubah kehidupan mereka.', imageUrl: '' },
-  { id: 'n4', title: 'Event Online vs Offline: Mana Lebih Baik?', date: '28 Mar 2026', category: 'Analysis', source: 'Event Research', excerpt: 'Analisis mendalam tentang kelebihan dan kekurangan event online dan offline.', imageUrl: '' },
-];
+// Removed static INIT_NEWS
 
 /* ================================================================
    MINI COMPONENTS
@@ -74,19 +70,100 @@ export default function AdminPengaturanPage() {
   // Data states
   const [bannerSlides, setBannerSlides] = useState(INIT_BANNER);
   const [heroCards, setHeroCards] = useState(INIT_HERO_CARDS);
-  const [newsItems, setNewsItems] = useState(INIT_NEWS);
+  const [newsItems, setNewsItems] = useState([]);
+  const [kategoriBerita, setKategoriBerita] = useState([]);
+  const [deletedNewsIds, setDeletedNewsIds] = useState([]);
 
   // Editing state
   const [activeBannerIdx, setActiveBannerIdx] = useState(0);
   const [editingNews, setEditingNews] = useState(null); // null or newsItem
 
-  const handleSave = () => {
+  useEffect(() => {
+    const fetchBerita = async () => {
+      try {
+        const res = await fetch(buildApiUrl('/api/berita'));
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            setNewsItems(data.map(d => ({
+              id: d.id,
+              title: d.judul,
+              date: d.tanggal,
+              kategori_id: d.kategori_id,
+              category: d.kategori?.nama_kategori || '',
+              source: d.sumber,
+              excerpt: d.ringkasan,
+              imageUrl: d.gambar || ''
+            })));
+          }
+        }
+      } catch (err) { console.error('Fetch berita error:', err); }
+    };
+    const fetchKategori = async () => {
+      try {
+        const res = await fetch(buildApiUrl('/api/kategori-berita'));
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) setKategoriBerita(data);
+        }
+      } catch (err) { console.error('Fetch kategori error:', err); }
+    };
+    fetchBerita();
+    fetchKategori();
+  }, []);
+
+  const handleSave = async () => {
     setIsSaving(true);
-    setTimeout(() => {
-      setIsSaving(false);
+    try {
+      const token = getToken();
+      // Proses hapus berita
+      for (const id of deletedNewsIds) {
+        if (!String(id).startsWith('n')) {
+          await fetch(buildApiUrl(`/api/berita/${id}`), {
+            method: 'DELETE',
+            headers: { ...defaultHeaders, Authorization: `Bearer ${token}` }
+          });
+        }
+      }
+
+      // Proses simpan berita (POST/PUT)
+      for (const item of newsItems) {
+        const payload = {
+          judul: item.title || 'Judul Baru',
+          kategori_id: item.kategori_id || (kategoriBerita[0]?.id || 1),
+          sumber: item.source || 'https://event.com',
+          ringkasan: item.excerpt || 'Ringkasan berita',
+          konten: item.excerpt || 'Konten berita',
+          gambar: item.imageUrl || null,
+          tanggal: item.date || new Date().toISOString().split('T')[0]
+        };
+
+        if (String(item.id).startsWith('n')) {
+          // Berita baru
+          await fetch(buildApiUrl('/api/berita'), {
+            method: 'POST',
+            headers: { ...defaultHeaders, Authorization: `Bearer ${token}` },
+            body: JSON.stringify(payload)
+          });
+        } else {
+          // Update berita
+          await fetch(buildApiUrl(`/api/berita/${item.id}`), {
+            method: 'PUT',
+            headers: { ...defaultHeaders, Authorization: `Bearer ${token}` },
+            body: JSON.stringify(payload)
+          });
+        }
+      }
+
+      setDeletedNewsIds([]);
       setShowToast(true);
       setTimeout(() => setShowToast(false), 3000);
-    }, 1000);
+    } catch (err) {
+      console.error('Error saving settings', err);
+      alert('Gagal menyimpan pengaturan.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleImageUpload = (e, setter, idx, key) => {
@@ -123,11 +200,23 @@ export default function AdminPengaturanPage() {
     if (editingNews?.id === id) setEditingNews(prev => ({ ...prev, [field]: value }));
   };
   const deleteNews = (id) => {
+    setDeletedNewsIds(prev => [...prev, id]);
     setNewsItems(prev => prev.filter(n => n.id !== id));
     if (editingNews?.id === id) setEditingNews(null);
   };
   const addNews = () => {
-    const newItem = { id: `n${Date.now()}`, title: 'Judul Berita Baru', date: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }), category: 'Umum', source: 'EventHub News', excerpt: 'Tulis ringkasan berita di sini...', imageUrl: '' };
+    const defaultKategoriId = kategoriBerita.length > 0 ? kategoriBerita[0].id : '';
+    const defaultKategoriName = kategoriBerita.length > 0 ? kategoriBerita[0].nama_kategori : 'Umum';
+    const newItem = { 
+      id: `n${Date.now()}`, 
+      title: 'Judul Berita Baru', 
+      date: new Date().toISOString().split('T')[0], 
+      kategori_id: defaultKategoriId,
+      category: defaultKategoriName, 
+      source: 'https://eventhub.com', 
+      excerpt: 'Tulis ringkasan berita di sini...', 
+      imageUrl: '' 
+    };
     setNewsItems(prev => [...prev, newItem]);
     setEditingNews(newItem);
   };
@@ -378,11 +467,26 @@ export default function AdminPengaturanPage() {
                 <div className="aps-field-row">
                   <div className="aps-field">
                     <label><Tag size={13} /> Kategori</label>
-                    <input className="aps-input" value={editingNews.category} onChange={e => { setEditingNews({...editingNews, category: e.target.value}); updateNews(editingNews.id, 'category', e.target.value); }} />
+                    <select 
+                      className="aps-input" 
+                      value={editingNews.kategori_id || ''} 
+                      onChange={e => {
+                        const selId = Number(e.target.value);
+                        const selCat = kategoriBerita.find(k => k.id === selId);
+                        setEditingNews({...editingNews, kategori_id: selId, category: selCat?.nama_kategori || ''}); 
+                        updateNews(editingNews.id, 'kategori_id', selId); 
+                        updateNews(editingNews.id, 'category', selCat?.nama_kategori || ''); 
+                      }}
+                    >
+                      <option value="" disabled>Pilih Kategori</option>
+                      {kategoriBerita.map(k => (
+                        <option key={k.id} value={k.id}>{k.nama_kategori}</option>
+                      ))}
+                    </select>
                   </div>
                   <div className="aps-field">
                     <label><Calendar size={13} /> Tanggal</label>
-                    <input className="aps-input" value={editingNews.date} onChange={e => { setEditingNews({...editingNews, date: e.target.value}); updateNews(editingNews.id, 'date', e.target.value); }} />
+                    <input type="date" className="aps-input" value={editingNews.date} onChange={e => { setEditingNews({...editingNews, date: e.target.value}); updateNews(editingNews.id, 'date', e.target.value); }} />
                   </div>
                 </div>
                 <div className="aps-field">

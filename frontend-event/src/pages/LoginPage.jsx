@@ -53,6 +53,8 @@ const LoginPage = () => {
         setTimeout(() => {
           if (data.data?.role === 'admin') {
             navigate('/admin/dashboard');
+          } else if (data.data?.role === 'penyelenggara') {
+            navigate('/penyelenggara/dashboard');
           } else {
             navigate('/');
           }

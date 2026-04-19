@@ -1,21 +1,12 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend,
   LineChart, Line
 } from 'recharts';
 import { Download, Calendar, Filter, FileText, CheckCircle, Users } from 'lucide-react';
+import { buildApiUrl, defaultHeaders } from '../utils/api';
+import { getToken } from '../utils/auth';
 import '../styles/AdminLaporanPage.css';
-
-// --- Mock Data Laporan ---
-const mockEventReports = [
-  { id: 1, nama_event: 'Tech Conference 2024', penyelenggara: 'Komunitas IT Bandung', tanggal: '2024-03-15', pendaftar: 250, hadir: 210 },
-  { id: 2, nama_event: 'Workshop Fotografi Dasar', penyelenggara: 'Budi Santoso', tanggal: '2024-03-20', pendaftar: 50, hadir: 45 },
-  { id: 3, nama_event: 'Seminar Startup Digital', penyelenggara: 'PT Maju Bersama', tanggal: '2024-04-10', pendaftar: 150, hadir: 120 },
-  { id: 4, nama_event: 'Pelatihan Web Development', penyelenggara: 'Komunitas IT Bandung', tanggal: '2024-04-25', pendaftar: 100, hadir: 85 },
-  { id: 5, nama_event: 'Bazar Buku Tahunan', penyelenggara: 'Universitas Terbuka', tanggal: '2024-05-05', pendaftar: 500, hadir: 480 },
-  { id: 6, nama_event: 'Lomba Esport Regional', penyelenggara: 'Andi Pratama', tanggal: '2024-06-12', pendaftar: 300, hadir: 290 },
-  { id: 7, nama_event: 'Simposium Kedokteran', penyelenggara: 'PT Maju Bersama', tanggal: '2024-06-25', pendaftar: 200, hadir: 180 },
-];
 
 const BULAN = ['Semua Bulan', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
@@ -23,10 +14,32 @@ export default function AdminLaporanPage() {
   const [tab, setTab] = useState('event'); // 'event' | 'penyelenggara'
   const [filterTahun, setFilterTahun] = useState('2024');
   const [filterBulan, setFilterBulan] = useState('0'); // 0 = Semua
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchLaporan = async () => {
+      try {
+        const token = getToken();
+        const res = await fetch(buildApiUrl('/api/admin/laporan'), {
+          headers: { ...defaultHeaders, Authorization: `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+          setReports(data.data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch laporan', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchLaporan();
+  }, []);
 
   // Filter Data Berdasarkan Waktu
   const filteredEvents = useMemo(() => {
-    return mockEventReports.filter(ev => {
+    return reports.filter(ev => {
       const date = new Date(ev.tanggal);
       const yearMatch = filterTahun === 'semua' || date.getFullYear().toString() === filterTahun;
       const monthMatch = filterBulan === '0' || (date.getMonth() + 1).toString() === filterBulan;
@@ -144,6 +157,8 @@ export default function AdminLaporanPage() {
             <Filter size={16} color="#94a3b8" />
             <select className="alp-select" value={filterTahun} onChange={e => setFilterTahun(e.target.value)}>
               <option value="semua">Semua Tahun</option>
+              <option value="2026">2026</option>
+              <option value="2025">2025</option>
               <option value="2024">2024</option>
               <option value="2023">2023</option>
             </select>
@@ -178,6 +193,8 @@ export default function AdminLaporanPage() {
                   <Bar dataKey="Hadir" fill="#10b981" radius={[4, 4, 0, 0]} barSize={25} />
                 </BarChart>
               </ResponsiveContainer>
+            ) : loading ? (
+              <div className="alp-empty-chart">Memuat data...</div>
             ) : (
               <div className="alp-empty-chart">Tidak ada data di periode ini</div>
             )}
@@ -201,6 +218,8 @@ export default function AdminLaporanPage() {
                   <Line type="monotone" dataKey="Hadir" stroke="#a855f7" strokeWidth={3} dot={{ r: 4, fill: '#1e293b', strokeWidth: 2 }} activeDot={{ r: 6 }} />
                 </LineChart>
               </ResponsiveContainer>
+            ) : loading ? (
+              <div className="alp-empty-chart">Memuat data...</div>
             ) : (
               <div className="alp-empty-chart">Tidak ada data di periode ini</div>
             )}
@@ -234,7 +253,9 @@ export default function AdminLaporanPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredEvents.length === 0 ? (
+                  {loading ? (
+                    <tr><td colSpan={6} className="text-center py-4 text-muted">Memuat data...</td></tr>
+                  ) : filteredEvents.length === 0 ? (
                     <tr><td colSpan={6} className="text-center py-4 text-muted">Tidak ada data</td></tr>
                   ) : filteredEvents.map(item => {
                     const pct = item.pendaftar > 0 ? Math.round((item.hadir / item.pendaftar) * 100) : 0;
@@ -267,7 +288,9 @@ export default function AdminLaporanPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {organizerReports.length === 0 ? (
+                  {loading ? (
+                    <tr><td colSpan={5} className="text-center py-4 text-muted">Memuat data...</td></tr>
+                  ) : organizerReports.length === 0 ? (
                     <tr><td colSpan={5} className="text-center py-4 text-muted">Tidak ada data</td></tr>
                   ) : organizerReports.map((item, idx) => {
                     const pct = item.total_pendaftar > 0 ? Math.round((item.total_hadir / item.total_pendaftar) * 100) : 0;

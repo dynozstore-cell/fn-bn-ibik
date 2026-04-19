@@ -13,6 +13,8 @@ use App\Http\Controllers\BeritaController;
 use App\Http\Controllers\KategoriBeritaController;
 use App\Http\Controllers\OTPController;
 use App\Http\Controllers\AdminDashboardController;
+use App\Http\Controllers\PenyelenggaraController;
+use App\Http\Controllers\UploadController;
 
 /*
 |--------------------------------------------------------------------------
@@ -35,8 +37,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout',  [AuthController::class, 'logout']);
     Route::get('/me',       [AuthController::class, 'me']);
     
+    // User Profile
+    Route::put('/user/profile',   [AuthController::class, 'updateProfile']);
+    Route::put('/user/password',  [AuthController::class, 'updatePassword']);
+    Route::delete('/user/account', [AuthController::class, 'deleteAccount']);
+
     // Admin Dashboard
     Route::get('/admin/dashboard-stats', [AdminDashboardController::class, 'index']);
+    // Admin: semua user
+    Route::get('/admin/users', [AdminDashboardController::class, 'getAllUsers']);
+    // Admin: laporan
+    Route::get('/admin/laporan', [AdminDashboardController::class, 'getLaporan']);
 });
 
 // ─── Event Routes ──────────────────────────────────────────────────────────
@@ -60,12 +71,16 @@ Route::delete('/daftar-event/{id}', [PendaftaranEventController::class, 'destroy
 Route::post('/kontak-event',       [KontakEventController::class, 'store']);
 Route::get('/kontak-event',        [KontakEventController::class, 'index']);
 Route::put('/kontak-event/{id}',   [KontakEventController::class, 'update']);
+Route::delete('/kontak-event/{id}', [KontakEventController::class, 'destroy']);
+
 
 // ─── Pembayaran Routes ─────────────────────────────────────────────────────
-Route::get('/pembayaran',                    [PembayaranController::class, 'index']);
-Route::post('/pembayaran',                   [PembayaranController::class, 'store']);
-Route::get('/pembayaran/{id}',               [PembayaranController::class, 'show']);
-Route::put('/pembayaran/{id}/verifikasi',    [PembayaranController::class, 'verifikasi']);
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/pembayaran',                    [PembayaranController::class, 'index']);
+    Route::post('/pembayaran',                   [PembayaranController::class, 'store']);
+    Route::get('/pembayaran/{id}',               [PembayaranController::class, 'show']);
+    Route::put('/pembayaran/{id}/verifikasi',    [PembayaranController::class, 'verifikasi']);
+});
 
 // ─── Metode Pembayaran Routes ──────────────────────────────────────────────
 Route::get('/metode-pembayaran',       [MetodePembayaranController::class, 'index']);
@@ -74,6 +89,9 @@ Route::get('/metode-pembayaran/{id}',  [MetodePembayaranController::class, 'show
 
 // ─── Kategori Routes ───────────────────────────────────────────────────────
 Route::get('/kategori', [KategoriController::class, 'index']);
+
+// ─── Upload Routes ─────────────────────────────────────────────────────────
+Route::post('/upload-poster', [UploadController::class, 'uploadPoster']);
 
 // ─── Berita Routes ─────────────────────────────────────────────────────────
 Route::get('/berita', [BeritaController::class, 'index']);
@@ -90,4 +108,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/kategori-berita', [KategoriBeritaController::class, 'store']);
     Route::put('/kategori-berita/{id}', [KategoriBeritaController::class, 'update']);
     Route::delete('/kategori-berita/{id}', [KategoriBeritaController::class, 'destroy']);
+});
+
+// ─── Penyelenggara Routes ─────────────────────────────────────────────────
+Route::get('/penyelenggara', [PenyelenggaraController::class, 'index']);
+Route::get('/penyelenggara/dashboard-stats', [PenyelenggaraController::class, 'dashboardStats']);
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/penyelenggara', [PenyelenggaraController::class, 'store']);
+    Route::put('/penyelenggara/{id}', [PenyelenggaraController::class, 'update']);
+    Route::put('/penyelenggara/{id}/toggle-status', [PenyelenggaraController::class, 'toggleStatus']);
+    Route::delete('/penyelenggara/{id}', [PenyelenggaraController::class, 'destroy']);
 });

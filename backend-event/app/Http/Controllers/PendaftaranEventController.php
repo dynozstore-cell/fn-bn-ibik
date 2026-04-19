@@ -15,9 +15,15 @@ class PendaftaranEventController extends Controller
         return $daftar;
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        $data = PendaftaranEvent::with(['user', 'event', 'pembayaran'])->get()->map(function ($daftar) {
+        $query = PendaftaranEvent::with(['user', 'event', 'pembayaran']);
+
+        if ($request->has('event_id')) {
+            $query->where('event_id', $request->event_id);
+        }
+
+        $data = $query->get()->map(function ($daftar) {
             return $this->transformPendaftaran($daftar);
         });
 
@@ -42,8 +48,11 @@ class PendaftaranEventController extends Controller
         $daftar = PendaftaranEvent::create([
             'user_id' => $request->user_id,
             'event_id' => $request->event_id,
+            'jumlah_tiket' => $request->jumlah_tiket ?? 1,
+            'total_harga' => $request->total_harga ?? 0,
             'tanggal_daftar' => now(),
-            'status_pendaftaran' => 'pending'
+            'status_pendaftaran' => $request->status_pendaftaran ?? 'pending',
+            'custom_form_responses' => $request->custom_form_responses
         ]);
 
         return response()->json([

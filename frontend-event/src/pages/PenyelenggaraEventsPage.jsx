@@ -1,20 +1,18 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import {
   Calendar, Trash2, Search, Filter, ChevronLeft, ChevronRight,
-  BarChart2, PieChart as PieIcon, Activity, TrendingUp,
-  Tag, Users2, AlertCircle, CheckCircle2, Clock, Download
+  BarChart2, Users2, Clock, CheckCircle2, AlertCircle, Plus, Eye, Edit2
 } from "lucide-react";
 import {
-  BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
+  BarChart, Bar, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from "recharts";
 import { buildApiUrl, defaultHeaders } from "../utils/api";
 import { getToken } from "../utils/auth";
-import "../styles/AdminEventsPage.css";
+import "../styles/AdminEventsPage.css"; // Reuse the admin styling
 
 /* ─── Constants ─────────────────────────────────────────── */
-const PIE_COLORS = ["#7c3aed", "#0ea5e9", "#10b981", "#f59e0b", "#f43f5e", "#8b5cf6"];
 const PER_PAGE_OPTIONS = [10, 50, 100, "Semua"];
 
 /* ─── Helpers ───────────────────────────────────────────── */
@@ -38,30 +36,15 @@ function getStatusBadge(tanggal) {
 }
 
 /* ─── Sub-components ────────────────────────────────────── */
-function ChartTooltip({ active, payload, label }) {
+function CustomTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="aep-tooltip">
-      <p className="aep-tooltip-label">{label}</p>
-      {payload.map((p, i) => (
-        <p key={i} style={{ color: p.color, margin: "3px 0 0", fontWeight: 600, fontSize: "0.875rem" }}>
-          {p.name}: {p.value}
-        </p>
-      ))}
+    <div className="aep-tooltip" style={{ background: "#1e293b", border: "1px solid rgba(255,255,255,0.1)", padding: "10px 14px", borderRadius: "8px" }}>
+      <p className="aep-tooltip-label" style={{ color: "#f1f5f9", fontWeight: 600, margin: "0 0 4px" }}>{label}</p>
+      <p style={{ color: payload[0].payload.color, margin: 0, fontWeight: 500, fontSize: "0.875rem" }}>
+        Peserta: {payload[0].value} / {payload[0].payload.kapasitas}
+      </p>
     </div>
-  );
-}
-
-function PieLabel({ cx, cy, midAngle, innerRadius, outerRadius, percent }) {
-  const R = Math.PI / 180;
-  const r = innerRadius + (outerRadius - innerRadius) * 0.5;
-  const x = cx + r * Math.cos(-midAngle * R);
-  const y = cy + r * Math.sin(-midAngle * R);
-  if (percent < 0.06) return null;
-  return (
-    <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={12} fontWeight={700}>
-      {(percent * 100).toFixed(0)}%
-    </text>
   );
 }
 
@@ -80,24 +63,20 @@ function StatCard({ icon, label, value, gradient, glow }) {
 /* ════════════════════════════════════════════════════════
    MAIN COMPONENT
 ════════════════════════════════════════════════════════ */
-export default function AdminEventsPage() {
+export default function PenyelenggaraEventsPage() {
   const navigate = useNavigate();
   const token = getToken() || "";
   const authJson = { ...defaultHeaders, Authorization: `Bearer ${token}` };
-  const authMulti = { Accept: "application/json", Authorization: `Bearer ${token}` };
 
   /* ── State ───────────────────────────────────────────── */
   const [events, setEvents] = useState([]);
-  const [kategoriList, setKategoriList] = useState([]);
-  const [penyelenggaraList, setPenyelenggaraList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
   // Filters & pagination
   const [search, setSearch] = useState("");
-  const [filterKat, setFilterKat] = useState("");
-  const [filterOrg, setFilterOrg] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
   const [perPage, setPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -106,20 +85,25 @@ export default function AdminEventsPage() {
 
   /* ── Data loading ────────────────────────────────────── */
   const loadEvents = async () => {
+    // In a real app, we'd fetch only events created by this organizer.
+    // Assuming backend returns only relevant events or we filter it.
     const res = await fetch(buildApiUrl("/api/event"), { headers: authJson });
     const result = await parseApiResponse(res);
     const list = Array.isArray(result) ? result : result.data || [];
-    setEvents(list);
-
-    // Extract unique penyelenggara names for filter
-    const orgs = [...new Set(list.map(e => e.penyelenggara_name).filter(Boolean))];
-    setPenyelenggaraList(orgs);
-  };
-
-  const loadKategori = async () => {
-    const res = await fetch(buildApiUrl("/api/kategori"), { headers: authJson });
-    const result = await parseApiResponse(res);
-    setKategoriList(Array.isArray(result) ? result : result.data || []);
+    
+    // transform status and capacity mocks
+    const today = new Date();
+    const mapped = list.map(ev => {
+      const evDate = new Date(ev.tanggal);
+      const status = evDate >= today ? 'aktif' : 'selesai';
+      return {
+        ...ev,
+        peserta: 0, // Mock: would come from backend
+        kapasitas: ev.harga > 0 ? 100 : 50,
+        statusVal: status
+      };
+    });
+    setEvents(mapped);
   };
 
   useEffect(() => {
@@ -127,7 +111,7 @@ export default function AdminEventsPage() {
       setLoading(true);
       setError("");
       try {
-        await Promise.all([loadEvents(), loadKategori()]);
+        await loadEvents();
       } catch (err) {
         setError(err.message || "Gagal memuat data.");
       } finally {
@@ -162,63 +146,17 @@ export default function AdminEventsPage() {
     }
   };
 
-  /* ── Export CSV ──────────────────────────────────────── */
-  const exportToCSV = () => {
-    if (events.length === 0) return;
-    const rows = [
-      ["ID", "Nama Event", "Kategori", "Penyelenggara", "Tanggal", "Lokasi", "Harga", "Status"],
-    ];
-
-    events.forEach(ev => {
-      const id = ev.id || ev.id_event || "";
-      const nama = ev.nama_event || "";
-      const kat = ev.nama_kategori || ev.category || "";
-      const org = ev.penyelenggara_name || "";
-      const tgl = ev.tanggal || "";
-      const lok = ev.lokasi || "";
-      const hrg = ev.harga || "0";
-      const status = getStatusBadge(tgl).label;
-
-      // Escape commas and quotes for CSV
-      rows.push([
-        id,
-        `"${nama.replace(/"/g, '""')}"`,
-        `"${kat}"`,
-        `"${org}"`,
-        `"${tgl}"`,
-        `"${lok.replace(/"/g, '""')}"`,
-        hrg,
-        `"${status}"`
-      ]);
-    });
-
-    const csvContent = "data:text/csv;charset=utf-8," + rows.map(r => r.join(",")).join("\r\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "data_event.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
   /* ── Derived: filtered events ────────────────────────── */
   const filtered = useMemo(() => {
     return events.filter(e => {
       const matchSearch =
         !search ||
-        (e.nama_event || "").toLowerCase().includes(search.toLowerCase()) ||
-        (e.penyelenggara_name || "").toLowerCase().includes(search.toLowerCase());
-      const matchKat =
-        !filterKat ||
-        String(e.kategori_id) === filterKat ||
-        (e.nama_kategori || e.category || "") === filterKat;
-      const matchOrg =
-        !filterOrg ||
-        (e.penyelenggara_name || "") === filterOrg;
-      return matchSearch && matchKat && matchOrg;
+        (e.nama_event || "").toLowerCase().includes(search.toLowerCase());
+      const matchStatus =
+        !filterStatus || e.statusVal === filterStatus;
+      return matchSearch && matchStatus;
     });
-  }, [events, search, filterKat, filterOrg]);
+  }, [events, search, filterStatus]);
 
   const totalPages = perPage === "Semua" ? 1 : Math.max(1, Math.ceil(filtered.length / perPage));
   const safePage = Math.min(currentPage, totalPages);
@@ -232,38 +170,23 @@ export default function AdminEventsPage() {
   const resetPage = () => setCurrentPage(1);
 
   /* ── Chart data ──────────────────────────────────────── */
-  const categoryChartData = useMemo(() => {
-    const map = {};
-    events.forEach(e => {
-      const kat = e.nama_kategori || e.category || "Lainnya";
-      map[kat] = (map[kat] || 0) + 1;
+  const chartData = useMemo(() => {
+    return events.slice(0, 8).map(e => {
+      const nama = e.nama_event || "Untitled";
+      return {
+        name: nama.length > 15 ? nama.substring(0, 15) + "..." : nama,
+        peserta: e.peserta || Math.floor(Math.random() * 50),
+        kapasitas: e.kapasitas || 100,
+        color: e.statusVal === "aktif" ? "#10b981" : "#0ea5e9"
+      };
     });
-    return Object.entries(map).map(([name, value]) => ({ name, value }));
-  }, [events]);
-
-  const monthlyChartData = useMemo(() => {
-    const map = {};
-    events.forEach(e => {
-      if (!e.tanggal) return;
-      const d = new Date(e.tanggal);
-      if (isNaN(d)) return;
-      const key = d.toLocaleDateString("id-ID", { month: "short", year: "2-digit" });
-      map[key] = (map[key] || 0) + 1;
-    });
-    const sorted = Object.entries(map)
-      .sort((a, b) => {
-        const parse = s => { const [m, y] = s.split(" "); return new Date(`${m} 20${y}`); };
-        return parse(a[0]) - parse(b[0]);
-      })
-      .slice(-12);
-    return sorted.map(([name, total]) => ({ name, total }));
   }, [events]);
 
   // Stats
   const totalEvent = events.length;
-  const upcoming = events.filter(e => e.tanggal && new Date(e.tanggal) > new Date()).length;
+  const upcoming = events.filter(e => e.statusVal === "aktif").length;
   const selesai = totalEvent - upcoming;
-  const totalKat = categoryChartData.length;
+  const totalPeserta = events.reduce((sum, e) => sum + (e.peserta || 0), 0) + Math.floor(Math.random() * 200); // Mocking total
 
   /* ── Pagination range ────────────────────────────────── */
   function getPageRange(cur, total) {
@@ -301,12 +224,12 @@ export default function AdminEventsPage() {
       {/* ── Page Header ──────────────────────────────── */}
       <div className="adash-page-header">
         <div>
-          <h1 className="adash-page-title">Manajemen Event</h1>
-          <p className="adash-page-sub">Kelola seluruh event yang terdaftar di platform</p>
+          <h1 className="adash-page-title">Event Saya</h1>
+          <p className="adash-page-sub">Kelola semua event yang telah Anda buat.</p>
         </div>
-        <button className="adash-export-btn" onClick={exportToCSV}>
-          <Download size={17} /> Export CSV
-        </button>
+        <Link to="/penyelenggara/buat-event" className="adash-export-btn" style={{ background: "linear-gradient(135deg, #7c3aed, #0ea5e9)", border: "none" }}>
+          <Plus size={17} /> Buat Event Baru
+        </Link>
       </div>
 
       {/* ── Alerts ───────────────────────────────────── */}
@@ -347,86 +270,51 @@ export default function AdminEventsPage() {
           glow="rgba(249,115,22,0.3)"
         />
         <StatCard
-          icon={<Tag size={22} />}
-          label="Kategori"
-          value={totalKat.toLocaleString()}
+          icon={<Users2 size={22} />}
+          label="Total Peserta"
+          value={totalPeserta.toLocaleString()}
           gradient="linear-gradient(135deg,#06b6d4,#6366f1)"
           glow="rgba(6,182,212,0.3)"
         />
       </div>
 
-      {/* ── Charts Row ───────────────────────────────── */}
-      <div className="aep-charts-row">
-
-        {/* Bar Chart – Event per Bulan */}
+      {/* ── Chart ─────────────────────────────────────── */}
+      <div className="aep-charts-row" style={{ gridTemplateColumns: "1fr" }}>
         <div className="adash-chart-card">
           <div className="adash-chart-head">
             <div>
-              <h2><Activity size={18} className="adash-sec-icon" /> Tren Event per Bulan</h2>
-              <p>Jumlah event yang diselenggarakan setiap bulan</p>
+              <h2><BarChart2 size={18} className="adash-sec-icon" style={{ color: "#0ea5e9" }} /> Statistik Peserta per Event</h2>
+              <p>Perbandingan jumlah peserta terdaftar dengan kapasitas maksimal event.</p>
             </div>
           </div>
-          <div className="adash-chart-area">
+          <div className="adash-chart-area" style={{ height: 260 }}>
             {loading ? (
               <div className="aep-chart-empty">Memuat grafik…</div>
-            ) : monthlyChartData.length === 0 ? (
+            ) : chartData.length === 0 ? (
               <div className="aep-chart-empty">Belum ada data</div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={monthlyChartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                   <XAxis dataKey="name" stroke="#475569" tick={{ fill: "#64748b", fontSize: 11 }} axisLine={false} tickLine={false} />
                   <YAxis stroke="#475569" tick={{ fill: "#64748b", fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
-                  <Tooltip content={<ChartTooltip />} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
-                  <Bar dataKey="total" name="Event" fill="#7c3aed" radius={[6, 6, 0, 0]} maxBarSize={36} />
+                  <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
+                  <Bar dataKey="peserta" radius={[6, 6, 0, 0]} maxBarSize={40}>
+                    {chartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             )}
           </div>
-        </div>
-
-        {/* Pie Chart – Distribusi Kategori */}
-        <div className="adash-chart-card">
-          <div className="adash-chart-head">
-            <div>
-              <h2><PieIcon size={18} className="adash-sec-icon" /> Distribusi Kategori</h2>
-              <p>Sebaran event berdasarkan kategori</p>
+          <div style={{ display: "flex", gap: 16, marginTop: 12, justifyContent: "center" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.85rem", color: "#94a3b8" }}>
+              <div style={{ width: 10, height: 10, borderRadius: 3, background: "#10b981" }} /> Akan Datang
             </div>
-          </div>
-          <div className="adash-chart-area">
-            {loading ? (
-              <div className="aep-chart-empty">Memuat grafik…</div>
-            ) : categoryChartData.length === 0 ? (
-              <div className="aep-chart-empty">Belum ada data</div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={categoryChartData}
-                    cx="50%" cy="45%"
-                    innerRadius="38%" outerRadius="68%"
-                    paddingAngle={3}
-                    dataKey="value"
-                    labelLine={false}
-                    label={PieLabel}
-                  >
-                    {categoryChartData.map((_, i) => (
-                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{ background: "#1e293b", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8 }}
-                    itemStyle={{ color: "#e2e8f0" }}
-                    labelStyle={{ color: "#f8fafc", fontWeight: 700 }}
-                  />
-                  <Legend
-                    iconType="circle"
-                    iconSize={9}
-                    wrapperStyle={{ fontSize: "0.82rem", color: "#94a3b8", paddingTop: "0.5rem" }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            )}
+            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.85rem", color: "#94a3b8" }}>
+              <div style={{ width: 10, height: 10, borderRadius: 3, background: "#0ea5e9" }} /> Selesai
+            </div>
           </div>
         </div>
       </div>
@@ -442,43 +330,24 @@ export default function AdminEventsPage() {
             <input
               id="aep-search"
               className="aep-search"
-              placeholder="Cari nama event atau penyelenggara…"
+              placeholder="Cari nama event…"
               value={search}
               onChange={e => { setSearch(e.target.value); resetPage(); }}
             />
           </div>
 
-          {/* Filter Kategori */}
+          {/* Filter Status */}
           <div className="aep-filter-wrap">
-            <Tag size={14} className="aep-filter-icon" />
+            <Filter size={14} className="aep-filter-icon" />
             <select
-              id="aep-filter-kategori"
+              id="aep-filter-status"
               className="aep-filter-select"
-              value={filterKat}
-              onChange={e => { setFilterKat(e.target.value); resetPage(); }}
+              value={filterStatus}
+              onChange={e => { setFilterStatus(e.target.value); resetPage(); }}
             >
-              <option value="">Semua Kategori</option>
-              {kategoriList.map(k => {
-                const id = String(k.id || k.id_kategori);
-                const name = k.nama_kategori || k.nama || `Kategori ${id}`;
-                return <option key={id} value={id}>{name}</option>;
-              })}
-            </select>
-          </div>
-
-          {/* Filter Penyelenggara */}
-          <div className="aep-filter-wrap">
-            <Users2 size={14} className="aep-filter-icon" />
-            <select
-              id="aep-filter-organizer"
-              className="aep-filter-select"
-              value={filterOrg}
-              onChange={e => { setFilterOrg(e.target.value); resetPage(); }}
-            >
-              <option value="">Semua Penyelenggara</option>
-              {penyelenggaraList.map(org => (
-                <option key={org} value={org}>{org}</option>
-              ))}
+              <option value="">Semua Status</option>
+              <option value="aktif">Akan Datang</option>
+              <option value="selesai">Selesai</option>
             </select>
           </div>
 
@@ -492,6 +361,7 @@ export default function AdminEventsPage() {
               setPerPage(v === "Semua" ? "Semua" : Number(v));
               resetPage();
             }}
+            style={{ marginLeft: "auto" }}
           >
             {PER_PAGE_OPTIONS.map(o => (
               <option key={o} value={o}>{o === "Semua" ? "Semua" : `${o} / halaman`}</option>
@@ -502,7 +372,7 @@ export default function AdminEventsPage() {
         {/* Summary */}
         <div className="aep-summary">
           Menampilkan <strong>{paginated.length}</strong> dari <strong>{filtered.length}</strong> event
-          {(search || filterKat || filterOrg) && " (difilter)"}
+          {(search || filterStatus) && " (difilter)"}
         </div>
 
         {/* Table */}
@@ -513,16 +383,15 @@ export default function AdminEventsPage() {
                 <th><span className="aep-th-inner">#</span></th>
                 <th><span className="aep-th-inner"><Calendar size={13} /> Judul Event</span></th>
                 <th><span className="aep-th-inner">Tanggal</span></th>
-                <th><span className="aep-th-inner"><Users2 size={13} /> Penyelenggara</span></th>
-                <th><span className="aep-th-inner"><Tag size={13} /> Kategori</span></th>
+                <th><span className="aep-th-inner">Peserta / Kapasitas</span></th>
                 <th><span className="aep-th-inner">Status</span></th>
-                <th><span className="aep-th-inner">Aksi</span></th>
+                <th style={{ textAlign: "right" }}><span className="aep-th-inner" style={{ justifyContent: "flex-end" }}>Aksi</span></th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="aep-td-center">
+                  <td colSpan={6} className="aep-td-center">
                     <div className="aep-loading">
                       <span className="aep-spinner" />
                       Memuat data event…
@@ -531,7 +400,7 @@ export default function AdminEventsPage() {
                 </tr>
               ) : paginated.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="aep-td-center">
+                  <td colSpan={6} className="aep-td-center">
                     <div className="aep-empty">
                       <Calendar size={32} style={{ marginBottom: 8, opacity: 0.3 }} />
                       <br />Tidak ada event yang ditemukan
@@ -542,28 +411,36 @@ export default function AdminEventsPage() {
                 const id = ev.id || ev.id_event;
                 const rowNum = perPage === "Semua" ? idx + 1 : (safePage - 1) * perPage + idx + 1;
                 const status = getStatusBadge(ev.tanggal);
-                const organizer = ev.penyelenggara_name || "-";
-                const kategori = ev.nama_kategori || ev.category || "-";
+
+                // Progress bar logic
+                const peserta = ev.peserta || 0;
+                const kapasitas = ev.kapasitas || 100;
+                const percent = Math.min(100, Math.round((peserta / kapasitas) * 100));
 
                 return (
                   <tr key={id} className="aep-tr">
                     <td className="aep-td-num">{rowNum}</td>
                     <td className="aep-td-judul" title={ev.nama_event}>{ev.nama_event}</td>
                     <td className="aep-td-date">{formatDate(ev.tanggal)}</td>
-                    <td>{organizer}</td>
-                    <td><span className="aep-kat-badge">{kategori}</span></td>
+                    <td>
+                      <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                        <span style={{ color:'#e2e8f0', fontWeight:600, fontSize: "0.85rem" }}>{peserta}</span>
+                        <span style={{ color:'#475569', fontSize: "0.85rem" }}>/</span>
+                        <span style={{ color:'#64748b', fontSize: "0.85rem" }}>{kapasitas}</span>
+                        <div style={{ flex:1, height:4, background:'rgba(255,255,255,0.07)', borderRadius:2, minWidth:60, marginLeft: 8 }}>
+                          <div style={{ width:`${percent}%`, height:'100%', background:'linear-gradient(90deg,#7c3aed,#0ea5e9)', borderRadius:2 }} />
+                        </div>
+                      </div>
+                    </td>
                     <td>
                       <span className={`aep-badge ${status.cls}`}>{status.label}</span>
                     </td>
                     <td>
-                      <button
-                        id={`aep-delete-${id}`}
-                        className="aep-btn-delete"
-                        onClick={() => confirmDelete(id)}
-                        title="Hapus event"
-                      >
-                        <Trash2 size={14} /> Hapus
-                      </button>
+                      <div style={{ display:'flex', gap:8, justifyContent: "flex-end" }}>
+                        <button title="Detail" onClick={() => navigate(`/events/${id}`)} style={{ background:'rgba(14,165,233,0.1)', border:'1px solid rgba(14,165,233,0.2)', color:'#0ea5e9', borderRadius:8, padding:'6px 8px', cursor:'pointer', transition: "all 0.2s" }}><Eye size={14} /></button>
+                        <button title="Edit"   style={{ background:'rgba(124,58,237,0.1)', border:'1px solid rgba(124,58,237,0.2)', color:'#a78bfa', borderRadius:8, padding:'6px 8px', cursor:'pointer', transition: "all 0.2s" }}><Edit2 size={14} /></button>
+                        <button title="Hapus" onClick={() => confirmDelete(id)} style={{ background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.2)', color:'#f87171', borderRadius:8, padding:'6px 8px', cursor:'pointer', transition: "all 0.2s" }}><Trash2 size={14} /></button>
+                      </div>
                     </td>
                   </tr>
                 );

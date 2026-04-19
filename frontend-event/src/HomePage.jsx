@@ -1,9 +1,17 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./HomePage.css";
 import "./styles/Footer.css";
 import NavbarCustom from "./components/Navbar.jsx";
+import Footer from "./components/Footer.jsx";
 import { buildApiUrl } from "./utils/api";
+import { CalendarDays, MapPin, User, Share2 } from "lucide-react";
+
+function formatPrice(harga) {
+  const n = Number(harga);
+  if (harga == null || isNaN(n) || n <= 0) return "Gratis";
+  return `Rp ${n.toLocaleString("id-ID")}`;
+}
 
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1505373876077-705f7919a43b?w=1200&q=80";
 
@@ -87,6 +95,30 @@ function useCountdown(targetDate) {
   }, [targetDate?.getTime()]);
 
   return countdown;
+}
+
+function CountdownTimer({ targetDate }) {
+  const countdown = useCountdown(targetDate);
+  return (
+    <div className="countdown-boxes">
+      <div className="countdown-box">
+        <span className="countdown-num">{String(countdown.days).padStart(2, "0")}</span>
+        <span className="countdown-unit">hari</span>
+      </div>
+      <div className="countdown-box">
+        <span className="countdown-num">{String(countdown.hours).padStart(2, "0")}</span>
+        <span className="countdown-unit">jam</span>
+      </div>
+      <div className="countdown-box">
+        <span className="countdown-num">{String(countdown.minutes).padStart(2, "0")}</span>
+        <span className="countdown-unit">menit</span>
+      </div>
+      <div className="countdown-box">
+        <span className="countdown-num">{String(countdown.seconds).padStart(2, "0")}</span>
+        <span className="countdown-unit">detik</span>
+      </div>
+    </div>
+  );
 }
 
 const HERO_CARDS_FALLBACK = [
@@ -450,9 +482,11 @@ export default function HomePage() {
   const [showNewsDetail, setShowNewsDetail] = useState(false);
   const newsCarouselRef = useRef(null);
   const isNewsDraggingRef = useRef(false);
+  const isNewsPausedRef = useRef(false);
   const newsStartXRef = useRef(0);
   const newsScrollLeftRef = useRef(0);
   const [beritaList, setBeritaList] = useState([]);
+
 
   const latestList = useMemo(() => {
     const list = latestEvents.length ? latestEvents : events;
@@ -463,6 +497,103 @@ export default function HomePage() {
   const newsData = useMemo(() => {
     return transformBeritaToNews(beritaList);
   }, [beritaList]);
+
+  const newsLoopList = useMemo(() => {
+    if (!newsData.length) return [];
+    return [...newsData, ...newsData, ...newsData];
+  }, [newsData]);
+
+  // News Autoplay
+  const ensureNewsInMiddleLoop = () => {
+    const el = newsCarouselRef.current;
+    if (!el || !newsData.length) return;
+    const len = newsData.length;
+
+    const first = el.querySelector(".news-preview-card");
+    if (!first) return;
+
+    const cardW = first.offsetWidth;
+    const gap = 16;
+    const cycle = (cardW + gap) * len;
+    const x = el.scrollLeft;
+
+    if (x < cycle * 0.5 || x > cycle * 1.5) {
+      const centerX = x + el.offsetWidth / 2;
+      const cardIdx = Math.round((centerX - cardW / 2) / (cardW + gap));
+      const realIdx = ((cardIdx % len) + len) % len;
+      const targetScroll = (realIdx + len) * (cardW + gap) - el.offsetWidth / 2 + cardW / 2;
+
+      el.style.scrollBehavior = "auto";
+      el.scrollLeft = targetScroll;
+      requestAnimationFrame(() => {
+        el.style.scrollBehavior = "";
+      });
+      setSelectedNewsIdx(realIdx + len);
+    }
+  };
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (isNewsPausedRef.current || isNewsDraggingRef.current || showNewsDetail || !newsData.length) return;
+
+      const el = newsCarouselRef.current;
+      if (!el) return;
+
+      const len = newsData.length;
+      let nextIdx = selectedNewsIdx + 1;
+
+      // Reset ke tengah jika sudah di akhir loop ketiga
+      if (nextIdx >= len * 3) {
+        nextIdx = len;
+      }
+
+      // Jika berpindah dari loop 2 ke loop 3, kita biarkan saja. 
+      // Nanti onScroll akan memanggil ensureNewsInMiddleLoop untuk me-reset ke tengah.
+      // Tapi untuk "satu per satu", kita cukup geser index-nya.
+
+      setSelectedNewsIdx(nextIdx);
+
+      const cards = el.querySelectorAll(".news-preview-card");
+      const card = cards[nextIdx];
+      if (card) {
+        el.scrollTo({
+          left: card.offsetLeft - el.offsetWidth / 2 + card.offsetWidth / 2,
+          behavior: "smooth"
+        });
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [selectedNewsIdx, newsData.length, showNewsDetail]);
+
+  const scrollNewsManual = (dir) => {
+    const el = newsCarouselRef.current;
+    if (!el || !newsData.length) return;
+
+    isNewsPausedRef.current = true;
+    const len = newsData.length;
+    let nextIdx = selectedNewsIdx + dir;
+
+    // Handle bounds
+    if (nextIdx < 0) nextIdx = 0;
+    if (nextIdx >= len * 3) nextIdx = len * 3 - 1;
+
+    setSelectedNewsIdx(nextIdx);
+
+    const cards = el.querySelectorAll(".news-preview-card");
+    const card = cards[nextIdx];
+    if (card) {
+      el.scrollTo({
+        left: card.offsetLeft - el.offsetWidth / 2 + card.offsetWidth / 2,
+        behavior: "smooth"
+      });
+    }
+
+    // Resume after 5 seconds
+    setTimeout(() => {
+      isNewsPausedRef.current = false;
+    }, 5000);
+  };
 
   // 3x loop untuk infinite scroll (6 card asli x 3 = 18 card)
   const latestLoopList = useMemo(() => {
@@ -478,7 +609,8 @@ export default function HomePage() {
     return events
       .map((e) => ({ ...e, parsed: parseEventDate(e.tanggal || e.date) }))
       .filter((e) => e.parsed && e.parsed.getTime() > now.getTime())
-      .sort((a, b) => a.parsed - b.parsed);
+      .sort((a, b) => a.parsed - b.parsed)
+      .slice(0, 4);
   }, [events]);
 
   const [upcomingCarouselIdx, setUpcomingCarouselIdx] = useState(0);
@@ -525,10 +657,21 @@ export default function HomePage() {
   );
   const countdown = useCountdown(targetDate);
 
-  const shiftUpcoming = (dir) => {
+  const shiftUpcoming = useCallback((dir) => {
     if (upcomingEvents.length <= 1) return;
     setUpcomingCarouselIdx((i) => (i + dir + upcomingEvents.length) % upcomingEvents.length);
-  };
+  }, [upcomingEvents.length]);
+
+  // Autoplay Upcoming Countdown
+  const isUpcomingPausedRef = useRef(false);
+  useEffect(() => {
+    if (upcomingEvents.length <= 1) return;
+    const interval = setInterval(() => {
+      if (isUpcomingPausedRef.current) return;
+      shiftUpcoming(1);
+    }, 6000); // 6 detik per event mendatang
+    return () => clearInterval(interval);
+  }, [upcomingEvents.length, shiftUpcoming]);
 
   const bannerCarouselList = useMemo(() => buildBannerSlidesFromEvents(events), [events]);
 
@@ -691,6 +834,22 @@ export default function HomePage() {
     }
   };
 
+  const handleShare = (e, event) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const url = `${window.location.origin}/events/${event.id}`;
+    if (navigator.share) {
+      navigator.share({
+        title: event.nama_event,
+        text: `Check out this event: ${event.nama_event}`,
+        url: url,
+      }).catch(() => { });
+    } else {
+      navigator.clipboard.writeText(url);
+      alert("Link disalin ke clipboard!");
+    }
+  };
+
   // Initialize: set posisi awal ke copy tengah (card pertama)
   useEffect(() => {
     const el = latestRowRef.current;
@@ -705,27 +864,62 @@ export default function HomePage() {
     return () => clearTimeout(timer);
   }, [latestLoopList.length]);
 
-  // Scroll event listener untuk ensureLatestInMiddleLoop
+  // News Initialize: start in middle loop
   useEffect(() => {
-    const el = latestRowRef.current;
-    if (!el) return;
+    const el = newsCarouselRef.current;
+    if (!el || !newsLoopList.length) return;
 
-    let scrollTimer = null;
-    const onScroll = () => {
-      if (scrollTimer) clearTimeout(scrollTimer);
-      scrollTimer = setTimeout(() => {
-        if (!isDraggingRef.current) {
-          ensureLatestInMiddleLoop();
-        }
+    const timer = setTimeout(() => {
+      const len = newsData.length;
+      if (len === 0) return;
+
+      const cards = el.querySelectorAll(".news-preview-card");
+      const card = cards[len];
+      if (card) {
+        el.style.scrollBehavior = "auto";
+        el.scrollLeft = card.offsetLeft - el.offsetWidth / 2 + card.offsetWidth / 2;
+        setSelectedNewsIdx(len);
+        requestAnimationFrame(() => {
+          el.style.scrollBehavior = "";
+        });
+      }
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [newsLoopList.length]);
+
+  // Scroll event listener untuk ensureLatestInMiddleLoop & ensureNewsInMiddleLoop
+  useEffect(() => {
+    const elLatest = latestRowRef.current;
+    const elNews = newsCarouselRef.current;
+
+    let latestTimer = null;
+    let newsTimer = null;
+
+    const onScrollLatest = () => {
+      if (latestTimer) clearTimeout(latestTimer);
+      latestTimer = setTimeout(() => {
+        if (!isDraggingRef.current) ensureLatestInMiddleLoop();
       }, 150);
     };
 
-    el.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      el.removeEventListener("scroll", onScroll);
-      if (scrollTimer) clearTimeout(scrollTimer);
+    const onScrollNews = () => {
+      if (newsTimer) clearTimeout(newsTimer);
+      newsTimer = setTimeout(() => {
+        if (!isNewsDraggingRef.current) ensureNewsInMiddleLoop();
+      }, 150);
     };
-  }, []);
+
+    if (elLatest) elLatest.addEventListener("scroll", onScrollLatest, { passive: true });
+    if (elNews) elNews.addEventListener("scroll", onScrollNews, { passive: true });
+
+    return () => {
+      if (elLatest) elLatest.removeEventListener("scroll", onScrollLatest);
+      if (elNews) elNews.removeEventListener("scroll", onScrollNews);
+      if (latestTimer) clearTimeout(latestTimer);
+      if (newsTimer) clearTimeout(newsTimer);
+    };
+  }, [newsData.length]);
 
   // Autoplay dengan infinite loop
   useEffect(() => {
@@ -1128,27 +1322,39 @@ export default function HomePage() {
                       <img
                         src={event.foto_event_url}
                         alt={event.nama_event}
-                        style={{ width: "100%", height: "100%", objectFit: "cover", minHeight: 180 }}
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
                         onError={(e) => {
                           e.currentTarget.src = FALLBACK_IMAGE;
                         }}
                       />
                       <div className="event-card-tag">{event.category}</div>
+                      <div className="event-card-price">{formatPrice(event.harga)}</div>
                     </div>
                     <div className="event-card-body">
                       <h3 className="event-title">{event.nama_event}</h3>
+                      <p className="event-description">{(event.deskripsi || event.description || "").slice(0, 70)}...</p>
                       <div className="event-meta">
-                        <span className="event-meta-item">📅 {event.tanggal}</span>
-                        <span className="event-meta-item">📍 {event.lokasi}</span>
+                        <span className="event-meta-item">
+                          <CalendarDays size={14} className="event-meta-icon" /> {event.tanggal}
+                        </span>
+                        <span className="event-meta-item">
+                          <MapPin size={14} className="event-meta-icon" /> {event.lokasi}
+                        </span>
+                        <span className="event-meta-item">
+                          <User size={14} className="event-meta-icon" /> {event.organizer}
+                        </span>
                       </div>
-                      <p className="event-organizer">
-                        Oleh <strong>{event.organizer}</strong>
-                      </p>
                       <div className="event-actions">
-                        <Link to={`/events/${event.id}/ticket`} className="event-btn">
-                          {event.buttonLabel || "Beli Tiket"}
+                        <button
+                          type="button"
+                          className="event-btn-share"
+                          onClick={(e) => handleShare(e, event)}
+                        >
+                          <Share2 size={14} /> Share
+                        </button>
+                        <Link to={`/events/${event.id}`} className="event-btn">
+                          Detail Event
                         </Link>
-                        <Link to={`/events/${event.id}`} className="event-link">Detail</Link>
                       </div>
                     </div>
                   </article>
@@ -1170,7 +1376,11 @@ export default function HomePage() {
 
         {/* Countdown: event dari API yang tanggalnya masanya mendatang + urut paling dekat */}
         <section className="countdown-section">
-          <div className="container countdown-inner">
+          <div
+            className="container countdown-inner"
+            onMouseEnter={() => { isUpcomingPausedRef.current = true; }}
+            onMouseLeave={() => { isUpcomingPausedRef.current = false; }}
+          >
             <header className="countdown-header">
               <h2 className="countdown-section-title">Event yang Akan Datang</h2>
               <p className="countdown-section-subtitle">
@@ -1192,93 +1402,84 @@ export default function HomePage() {
                 </button>
               </div>
             ) : countdownDisplay ? (
-              <div className="countdown-card">
-                <div
-                  className={`countdown-image${countdownDisplay.foto_event_url ? " countdown-image--photo" : ""}`}
-                  style={
-                    countdownDisplay.foto_event_url
-                      ? {
-                        backgroundImage: `linear-gradient(135deg, rgba(15,13,26,0.75), rgba(30,26,46,0.35)), url(${countdownDisplay.foto_event_url})`,
-                        backgroundSize: "cover",
-                        backgroundPosition: "center",
-                      }
-                      : {
-                        background:
-                          countdownDisplay.imageGradient || "linear-gradient(135deg, #7c3aed, #a78bfa)",
-                      }
-                  }
-                  role="img"
-                  aria-label={countdownDisplay.title}
-                />
-                <div className="countdown-info">
-                  <p className="countdown-date">
-                    {upcomingEvents.length > 1 ? `${upcomingCarouselIdx + 1} / ${upcomingEvents.length} · ` : ""}
-                    {countdownDisplay.dateLabel}
-                  </p>
-                  <h2 className="countdown-title">{countdownDisplay.title}</h2>
-                  <p className="countdown-label">Event dimulai dalam</p>
-                  <div className="countdown-boxes">
-                    <div className="countdown-box">
-                      <span className="countdown-num">{String(countdown.days).padStart(2, "0")}</span>
-                      <span className="countdown-unit">hari</span>
+              <div className="countdown-card-container">
+                <div 
+                  className="countdown-card" 
+                  key={upcomingCarouselIdx}
+                  onClick={() => navigate(`/events/${countdownDisplay.id}`)}
+                  style={{ cursor: "pointer" }}
+                >
+                  <div
+                    className={`countdown-image${countdownDisplay.foto_event_url ? " countdown-image--photo" : ""}`}
+                    style={
+                      countdownDisplay.foto_event_url
+                        ? {
+                          backgroundImage: `linear-gradient(135deg, rgba(15,13,26,0.75), rgba(30,26,46,0.35)), url(${countdownDisplay.foto_event_url})`,
+                          backgroundSize: "cover",
+                          backgroundPosition: "center",
+                        }
+                        : {
+                          background:
+                            countdownDisplay.imageGradient || "linear-gradient(135deg, #7c3aed, #a78bfa)",
+                        }
+                    }
+                    role="img"
+                    aria-label={countdownDisplay.title}
+                  />
+                  <div className="countdown-info">
+                    <div className="countdown-top-meta">
+                      <span className="countdown-badge">{countdownDisplay.category || "Event"}</span>
+                      <span className="countdown-loc">
+                        <i className="bi bi-geo-alt me-1"></i> {countdownDisplay.location}
+                      </span>
                     </div>
-                    <div className="countdown-box">
-                      <span className="countdown-num">{String(countdown.hours).padStart(2, "0")}</span>
-                      <span className="countdown-unit">jam</span>
+                    <h2 className="countdown-title">{countdownDisplay.title}</h2>
+                    <p className="countdown-date">
+                      <i className="bi bi-calendar3 me-2"></i>
+                      {countdownDisplay.dateLabel}
+                    </p>
+                    <p className="countdown-label mt-3">Event dimulai dalam</p>
+                    
+                    <CountdownTimer targetDate={countdownDisplay.parsed} />
+
+                    <div className="countdown-owner">
+                      <div className="countdown-owner-avatar" />
+                      <span className="countdown-owner-label">Penyelenggara</span>
+                      <span className="countdown-owner-handle">
+                        {countdownDisplay.handle ||
+                          `@${(countdownDisplay.organizer || "").replace(/\s+/g, "").toLowerCase()}`}
+                      </span>
                     </div>
-                    <div className="countdown-box">
-                      <span className="countdown-num">{String(countdown.minutes).padStart(2, "0")}</span>
-                      <span className="countdown-unit">menit</span>
-                    </div>
-                    <div className="countdown-box">
-                      <span className="countdown-num">{String(countdown.seconds).padStart(2, "0")}</span>
-                      <span className="countdown-unit">detik</span>
-                    </div>
-                  </div>
-                  <div className="countdown-owner">
-                    <div className="countdown-owner-avatar" />
-                    <span className="countdown-owner-label">Penyelenggara</span>
-                    <span className="countdown-owner-handle">
-                      {countdownDisplay.handle ||
-                        `@${(countdownDisplay.organizer || "").replace(/\s+/g, "").toLowerCase()}`}
-                    </span>
-                  </div>
-                  <div className="countdown-actions">
-                    <button
-                      type="button"
-                      className="btn-countdown-primary"
-                      onClick={() => navigate("/events")}
-                    >
-                      Lihat Semua Upcoming
-                    </button>
-                    {countdownDisplay.id ? (
-                      <Link
-                        to={`/events/${countdownDisplay.id}`}
-                        className="btn btn-outline-light btn-sm align-self-center"
-                        style={{ borderRadius: "10px" }}
-                      >
-                        Detail
-                      </Link>
-                    ) : null}
-                    <div className="countdown-nav">
+                    <div className="countdown-actions">
                       <button
                         type="button"
-                        className="countdown-nav-btn"
-                        aria-label="Event mendatang sebelumnya"
-                        onClick={() => shiftUpcoming(-1)}
-                        disabled={upcomingEvents.length <= 1}
+                        className="btn-countdown-primary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate("/events");
+                        }}
                       >
-                        ←
+                        Lihat Semua Upcoming
                       </button>
-                      <button
-                        type="button"
-                        className="countdown-nav-btn countdown-nav-btn--active"
-                        aria-label="Event mendatang berikutnya"
-                        onClick={() => shiftUpcoming(1)}
-                        disabled={upcomingEvents.length <= 1}
-                      >
-                        →
-                      </button>
+                      
+                      {upcomingEvents.length > 1 && (
+                        <div className="countdown-nav" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            className="countdown-nav-btn"
+                            onClick={() => shiftUpcoming(-1)}
+                          >
+                            ‹
+                          </button>
+                          <button
+                            type="button"
+                            className="countdown-nav-btn"
+                            onClick={() => shiftUpcoming(1)}
+                          >
+                            ›
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1296,179 +1497,161 @@ export default function HomePage() {
             </div>
 
             {/* News cards horizontal */}
-            <div
-              className="news-preview-carousel"
-              ref={newsCarouselRef}
-              onMouseDown={(e) => {
-                isNewsDraggingRef.current = true;
-                newsStartXRef.current = e.pageX - newsCarouselRef.current.offsetLeft;
-                newsScrollLeftRef.current = newsCarouselRef.current.scrollLeft;
-              }}
-              onMouseLeave={() => {
-                isNewsDraggingRef.current = false;
-              }}
-              onMouseUp={() => {
-                isNewsDraggingRef.current = false;
-              }}
-              onMouseMove={(e) => {
-                if (!isNewsDraggingRef.current) return;
-                e.preventDefault();
-                const x = e.pageX - newsCarouselRef.current.offsetLeft;
-                const walk = x - newsStartXRef.current;
-                newsCarouselRef.current.scrollLeft = newsScrollLeftRef.current - walk;
-              }}
-              onTouchStart={(e) => {
-                newsStartXRef.current = e.touches[0].clientX;
-                newsScrollLeftRef.current = newsCarouselRef.current.scrollLeft;
-              }}
-              onTouchMove={(e) => {
-                const x = e.touches[0].clientX;
-                const walk = newsStartXRef.current - x;
-                newsCarouselRef.current.scrollLeft = newsScrollLeftRef.current + walk;
-              }}
-            >
-              {newsData.map((news, idx) => (
-                <article
-                  key={news.id}
-                  className={`news-preview-card ${idx === selectedNewsIdx ? "news-preview-card--active" : ""}`}
-                  onClick={() => {
-                    setSelectedNewsIdx(idx);
-                    setShowNewsDetail(true);
-                  }}
-                >
-                  <div
-                    className="news-preview-image"
-                    style={
-                      news.image && (news.image.startsWith('http://') || news.image.startsWith('https://'))
-                        ? {
-                          backgroundImage: `url(${news.image})`,
-                          backgroundSize: 'cover',
-                          backgroundPosition: 'center',
+            <div className="news-carousel-outer">
+              <button
+                className="news-nav-btn news-nav-btn--prev"
+                onClick={() => scrollNewsManual(-1)}
+                aria-label="Previous news"
+              >
+                ‹
+              </button>
+
+              <div
+                className="news-preview-carousel"
+                ref={newsCarouselRef}
+                onMouseEnter={() => { isNewsPausedRef.current = true; }}
+                onMouseLeave={() => {
+                  isNewsPausedRef.current = false;
+                  isNewsDraggingRef.current = false;
+                }}
+                onMouseDown={(e) => {
+                  isNewsPausedRef.current = true;
+                  isNewsDraggingRef.current = true;
+                  newsStartXRef.current = e.pageX - newsCarouselRef.current.offsetLeft;
+                  newsScrollLeftRef.current = newsCarouselRef.current.scrollLeft;
+                }}
+                onMouseUp={() => {
+                  isNewsDraggingRef.current = false;
+                }}
+                onMouseMove={(e) => {
+                  if (!isNewsDraggingRef.current) return;
+                  e.preventDefault();
+                  const x = e.pageX - newsCarouselRef.current.offsetLeft;
+                  const walk = x - newsStartXRef.current;
+                  newsCarouselRef.current.scrollLeft = newsScrollLeftRef.current - walk;
+                }}
+                onTouchStart={(e) => {
+                  isNewsPausedRef.current = true;
+                  newsStartXRef.current = e.touches[0].clientX;
+                  newsScrollLeftRef.current = newsCarouselRef.current.scrollLeft;
+                }}
+                onTouchEnd={() => {
+                  isNewsPausedRef.current = false;
+                }}
+                onTouchMove={(e) => {
+                  const x = e.touches[0].clientX;
+                  const walk = newsStartXRef.current - x;
+                  newsCarouselRef.current.scrollLeft = newsScrollLeftRef.current + walk;
+                }}
+              >
+                {newsLoopList.map((news, idx) => {
+                  const len = newsData.length;
+                  const realIdx = idx % len;
+                  const isActive = realIdx === (selectedNewsIdx % len);
+
+                  return (
+                    <article
+                      key={`${news.id}-${idx}`}
+                      className={`news-preview-card ${isActive ? "news-preview-card--active" : ""}`}
+                      onClick={() => {
+                        if (isNewsDraggingRef.current) return;
+                        setSelectedNewsIdx(idx);
+                        setShowNewsDetail(true);
+                      }}
+                    >
+                      <div
+                        className="news-preview-image"
+                        style={
+                          news.image && (news.image.startsWith('http://') || news.image.startsWith('https://'))
+                            ? {
+                              backgroundImage: `url(${news.image})`,
+                              backgroundSize: 'cover',
+                              backgroundPosition: 'center',
+                            }
+                            : { background: news.image }
                         }
-                        : { background: news.image }
-                    }
-                  />
-                  <div className="news-preview-info">
-                    <h4 className="news-preview-title">{news.title}</h4>
-                    <p className="news-preview-category">{news.category}</p>
-                    <p className="news-preview-date">{news.date}</p>
-                    <p className="news-preview-excerpt">{news.excerpt}</p>
-                  </div>
-                </article>
-              ))}
+                      />
+                      <div className="news-preview-info">
+                        <h4 className="news-preview-title">{news.title}</h4>
+                        <p className="news-preview-category">{news.category}</p>
+                        <p className="news-preview-date">{news.date}</p>
+                        <p className="news-preview-excerpt">{news.excerpt}</p>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+
+              <button
+                className="news-nav-btn news-nav-btn--next"
+                onClick={() => scrollNewsManual(1)}
+                aria-label="Next news"
+              >
+                ›
+              </button>
             </div>
           </div>
         </section>
 
         {/* News Detail Modal */}
-        {showNewsDetail && (
-          <div className="news-detail-overlay" onClick={() => setShowNewsDetail(false)}>
-            <div className="news-detail-modal" onClick={(e) => e.stopPropagation()}>
-              <button
-                type="button"
-                className="news-detail-close"
-                onClick={() => setShowNewsDetail(false)}
-                aria-label="Close"
-              >
-                ✕
-              </button>
-              <div
-                className="news-detail-image"
-                style={
-                  newsData[selectedNewsIdx]?.image &&
-                    (newsData[selectedNewsIdx].image.startsWith('http://') || newsData[selectedNewsIdx].image.startsWith('https://'))
-                    ? {
-                      backgroundImage: `url(${newsData[selectedNewsIdx].image})`,
-                      backgroundSize: 'cover',
-                      backgroundPosition: 'center',
-                    }
-                    : { background: newsData[selectedNewsIdx]?.image }
-                }
-              />
-              <div className="news-detail-content">
-                <span className="news-detail-category">{newsData[selectedNewsIdx]?.category}</span>
-                <h2 className="news-detail-title">{newsData[selectedNewsIdx]?.title}</h2>
-                <div className="news-detail-meta">
-                  <span className="news-detail-source">{newsData[selectedNewsIdx]?.source}</span>
-                  <span className="news-detail-date">{newsData[selectedNewsIdx]?.date}</span>
-                </div>
-                <article className="news-detail-text">{newsData[selectedNewsIdx]?.content}</article>
-                {newsData[selectedNewsIdx]?.link && (
-                  <div className="mt-3">
-                    <a
-                      href={newsData[selectedNewsIdx].link}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="btn btn-sm btn-outline-primary"
-                    >
-                      Baca Selengkapnya di Sumber →
-                    </a>
+        {showNewsDetail && (() => {
+          const currentNews = newsData[selectedNewsIdx % newsData.length];
+          if (!currentNews) return null;
+
+          return (
+            <div className="news-detail-overlay" onClick={() => setShowNewsDetail(false)}>
+              <div className="news-detail-modal" onClick={(e) => e.stopPropagation()}>
+                <button
+                  type="button"
+                  className="news-detail-close"
+                  onClick={() => setShowNewsDetail(false)}
+                  aria-label="Close"
+                >
+                  ✕
+                </button>
+                <div
+                  className="news-detail-image"
+                  style={
+                    currentNews.image &&
+                      (currentNews.image.startsWith('http://') || currentNews.image.startsWith('https://'))
+                      ? {
+                        backgroundImage: `url(${currentNews.image})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                      }
+                      : { background: currentNews.image }
+                  }
+                />
+                <div className="news-detail-content">
+                  <span className="news-detail-category">{currentNews.category}</span>
+                  <h2 className="news-detail-title">{currentNews.title}</h2>
+                  <div className="news-detail-meta">
+                    <span className="news-detail-source">{currentNews.source}</span>
+                    <span className="news-detail-date">{currentNews.date}</span>
                   </div>
-                )}
+                  <article className="news-detail-text">{currentNews.content}</article>
+                  {currentNews.link && (
+                    <div className="mt-3">
+                      <a
+                        href={currentNews.link}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn btn-sm btn-outline-primary"
+                        style={{ borderRadius: '8px', padding: '8px 16px' }}
+                      >
+                        Baca Selengkapnya di Sumber →
+                      </a>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
+
       </main>
 
-      <footer className="footer">
-        <div className="container footer-inner">
-          <div className="footer-top">
-            <div className="footer-brand">
-              <span className="footer-logo">🎯 EVENTPLACE</span>
-              <p className="footer-tagline">Platform terpercaya untuk menemukan dan mendaftar berbagai event menarik. Bergabunglah dengan komunitas kami dan jangan lewatkan pengalaman tak terlupakan.</p>
-            </div>
-            <div className="footer-contact">
-              <h4>Kontak</h4>
-              <p>
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style={{ marginRight: 6, verticalAlign: 'middle' }}>
-                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
-                </svg>
-                Jl. Raya Tajur, Kp. Buntar RT.02/RW.08, Kel. Muara Sari, Kec. Bogor Selatan, Kota Bogor, Jawa Barat 16137
-              </p>
-              <p>
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style={{ marginRight: 6, verticalAlign: 'middle' }}>
-                  <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z" />
-                </svg>
-                eventplace@gmail.com
-              </p>
-              <p>
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style={{ marginRight: 6, verticalAlign: 'middle' }}>
-                  <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z" />
-                </svg>
-                +62 831-6922-1045
-              </p>
-            </div>
-            <div className="footer-follow">
-              <h4>Ikuti Kami</h4>
-              <p>Tetap terhubung untuk update event terbaru</p>
-              <div className="footer-social">
-                <a href="#" aria-label="Instagram">
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
-                  </svg>
-                </a>
-                <a href="#" aria-label="Twitter">
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                  </svg>
-                </a>
-                <a href="#" aria-label="Facebook">
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-                  </svg>
-                </a>
-                <a href="#" aria-label="YouTube">
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                    <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
-                  </svg>
-                </a>
-              </div>
-            </div>
-          </div>
-          <p className="footer-copy">© 2026 EVENTPLACE Event Platform. All rights reserved.</p>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }
