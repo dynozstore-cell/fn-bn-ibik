@@ -44,6 +44,7 @@ export function clearAuth() {
 
 /** Logout ke server + bersihkan lokal */
 export async function logout() {
+  window.dispatchEvent(new Event('logging_out'));
   const token = getToken();
   if (token) {
     try {

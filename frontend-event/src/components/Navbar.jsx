@@ -8,6 +8,8 @@ const NavbarCustom = () => {
   const [scrolled, setScrolled] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isFadingOut, setIsFadingOut] = useState(false);
   const [authUser, setAuthUser] = useState(null);
   const navigate = useNavigate();
 
@@ -16,16 +18,33 @@ const NavbarCustom = () => {
       setAuthUser(getUser());
     };
     
+    const handleLoggingOut = () => {
+      setIsLoggingOut(true);
+      setIsFadingOut(false);
+      
+      // Keep overlay for 1.5s, then start fading out
+      setTimeout(() => {
+        setIsFadingOut(true);
+        // After fade animation (0.5s), remove overlay
+        setTimeout(() => {
+          setIsLoggingOut(false);
+          setIsFadingOut(false);
+        }, 500);
+      }, 1500);
+    };
+    
     // Initial fetch
     fetchUser();
     
-    // Listen to our custom event and storage events to detect auth changes dynamically
+    // Listen to our custom events and storage events to detect auth changes dynamically
     window.addEventListener('storage', fetchUser);
     window.addEventListener('auth_changed', fetchUser);
+    window.addEventListener('logging_out', handleLoggingOut);
     
     return () => {
       window.removeEventListener('storage', fetchUser);
       window.removeEventListener('auth_changed', fetchUser);
+      window.removeEventListener('logging_out', handleLoggingOut);
     };
   }, []);
 
@@ -80,15 +99,32 @@ const NavbarCustom = () => {
   };
 
   return (
-    <Navbar 
-      expand="lg" 
-      fixed="top" 
-      expanded={expanded}
-      onToggle={() => setExpanded(!expanded)}
-      className={`navbar-custom ${scrolled ? 'scrolled' : ''}`}
-    >
-      <Container>
-        <Navbar.Brand as={Link} to="/" className="d-flex align-items-center">
+    <>
+      {/* Logout Overlay */}
+      {isLoggingOut && (
+        <div className={`logout-overlay ${isFadingOut ? 'fade-out' : ''}`}>
+          <div className="logout-content">
+            <div className="d-flex justify-content-center">
+              <div style={{ position: 'relative' }}>
+                <div className="spinning" style={{ width: '80px', height: '80px', border: '4px solid rgba(168, 85, 247, 0.2)', borderTop: '4px solid #a855f7', borderRadius: '50%' }}></div>
+                <LogOut size={30} color="#a855f7" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }} />
+              </div>
+            </div>
+            <h2 className="logout-text">Sedang keluar...</h2>
+            <p className="text-white-50 mt-2">Sampai jumpa lagi di EventHub!</p>
+          </div>
+        </div>
+      )}
+
+      <Navbar 
+        expand="lg" 
+        fixed="top" 
+        expanded={expanded}
+        onToggle={() => setExpanded(!expanded)}
+        className={`navbar-custom ${scrolled ? 'scrolled' : ''}`}
+      >
+        <Container>
+          <Navbar.Brand as={Link} to="/" className="d-flex align-items-center">
           <Calendar size={28} style={{ color: '#6B46C1' }} />
           <span className="ms-2" style={{ color: '#6B46C1', fontSize: '1.5rem', fontWeight: '700' }}>
             EventHub
@@ -175,6 +211,7 @@ const NavbarCustom = () => {
         </Navbar.Collapse>
       </Container>
     </Navbar>
+    </>
   );
 };
 

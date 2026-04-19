@@ -460,6 +460,10 @@ function transformBeritaToNews(beritaList) {
 export default function HomePage() {
   const navigate = useNavigate();
   const [events, setEvents] = useState([]);
+  const [newsData, setNewsData] = useState([]);
+  const [customBanners, setCustomBanners] = useState([]);
+  const [customHeroCards, setCustomHeroCards] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [latestEvents, setLatestEvents] = useState([]);
   const [activeLatestIdx, setActiveLatestIdx] = useState(0);
   const [showAllFeaturedEvents, setShowAllFeaturedEvents] = useState(false);
@@ -485,7 +489,6 @@ export default function HomePage() {
   const isNewsPausedRef = useRef(false);
   const newsStartXRef = useRef(0);
   const newsScrollLeftRef = useRef(0);
-  const [beritaList, setBeritaList] = useState([]);
 
 
   const latestList = useMemo(() => {
@@ -494,20 +497,20 @@ export default function HomePage() {
     return normalized.length ? normalized : DEMO_LATEST_EVENTS;
   }, [events, latestEvents]);
 
-  const newsData = useMemo(() => {
-    return transformBeritaToNews(beritaList);
-  }, [beritaList]);
+  const transformedNews = useMemo(() => {
+    return transformBeritaToNews(newsData);
+  }, [newsData]);
 
   const newsLoopList = useMemo(() => {
-    if (!newsData.length) return [];
-    return [...newsData, ...newsData, ...newsData];
-  }, [newsData]);
+    if (!transformedNews.length) return [];
+    return [...transformedNews, ...transformedNews, ...transformedNews];
+  }, [transformedNews]);
 
   // News Autoplay
   const ensureNewsInMiddleLoop = () => {
     const el = newsCarouselRef.current;
-    if (!el || !newsData.length) return;
-    const len = newsData.length;
+    if (!el || !transformedNews.length) return;
+    const len = transformedNews.length;
 
     const first = el.querySelector(".news-preview-card");
     if (!first) return;
@@ -534,12 +537,12 @@ export default function HomePage() {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      if (isNewsPausedRef.current || isNewsDraggingRef.current || showNewsDetail || !newsData.length) return;
+      if (isNewsPausedRef.current || isNewsDraggingRef.current || showNewsDetail || !transformedNews.length) return;
 
       const el = newsCarouselRef.current;
       if (!el) return;
 
-      const len = newsData.length;
+      const len = transformedNews.length;
       let nextIdx = selectedNewsIdx + 1;
 
       // Reset ke tengah jika sudah di akhir loop ketiga
@@ -564,14 +567,14 @@ export default function HomePage() {
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [selectedNewsIdx, newsData.length, showNewsDetail]);
+  }, [selectedNewsIdx, transformedNews.length, showNewsDetail]);
 
   const scrollNewsManual = (dir) => {
     const el = newsCarouselRef.current;
-    if (!el || !newsData.length) return;
+    if (!el || !transformedNews.length) return;
 
     isNewsPausedRef.current = true;
-    const len = newsData.length;
+    const len = transformedNews.length;
     let nextIdx = selectedNewsIdx + dir;
 
     // Handle bounds
@@ -673,29 +676,41 @@ export default function HomePage() {
     return () => clearInterval(interval);
   }, [upcomingEvents.length, shiftUpcoming]);
 
-  const bannerCarouselList = useMemo(() => buildBannerSlidesFromEvents(events), [events]);
+  const bannerCarouselList = useMemo(() => {
+    if (customBanners.length > 0) return customBanners;
+    return buildBannerSlidesFromEvents(events);
+  }, [events, customBanners]);
 
-  const heroCards = useMemo(() => buildHeroCardsFromEvents(events), [events]);
+  const heroCards = useMemo(() => {
+    if (customHeroCards.length > 0) return customHeroCards;
+    return buildHeroCardsFromEvents(events);
+  }, [events, customHeroCards]);
 
   useEffect(() => {
-    fetch(buildApiUrl("/api/event"))
-      .then((res) => res.json())
-      .then((data) => {
-        const list = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
-        const mapped = list.map(normalizeEvent);
-        setEvents(mapped);
-        setLatestEvents(mapped);
-      })
-      .catch(() => { });
+    Promise.all([
+      fetch(buildApiUrl("/api/event"))
+        .then((res) => (res.ok ? res.json() : { data: [] }))
+        .then((data) => {
+          const list = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
+          const mapped = list.map(normalizeEvent);
+          setEvents(mapped);
+          setLatestEvents(mapped);
+        })
+        .catch(() => {}),
 
-    // Fetch berita dari API
-    fetch(buildApiUrl("/api/berita"))
-      .then((res) => res.json())
-      .then((data) => {
-        const list = Array.isArray(data) ? data : [];
-        setBeritaList(list);
-      })
-      .catch(() => { });
+      fetch(buildApiUrl("/api/berita"))
+        .then((res) => (res.ok ? res.json() : []))
+        .then((data) => setNewsData(data))
+        .catch(() => setNewsData([])),
+
+      fetch(buildApiUrl("/api/settings"))
+        .then((res) => (res.ok ? res.json() : {}))
+        .then((data) => {
+          if (data.homepage_banners) setCustomBanners(data.homepage_banners);
+          if (data.homepage_hero_cards) setCustomHeroCards(data.homepage_hero_cards);
+        })
+        .catch(() => {}),
+    ]).finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -1103,7 +1118,7 @@ export default function HomePage() {
   }, [activeBannerIdx, bannerCarouselList.length]);
 
   return (
-    <div className="page flacto-style">
+    <div className="page flacto-style page-fade-in">
       <NavbarCustom />
 
       <main>
@@ -1229,7 +1244,7 @@ export default function HomePage() {
                           style={
                             banner.foto_event_url
                               ? {
-                                backgroundImage: `linear-gradient(135deg, rgba(15,13,26,0.82), rgba(30,26,46,0.4)), url(${banner.foto_event_url})`,
+                                backgroundImage: `linear-gradient(135deg, rgba(15,13,26,0.2), rgba(30,26,46,0.1)), url(${banner.foto_event_url})`,
                                 backgroundSize: "cover",
                                 backgroundPosition: "center",
                               }
@@ -1239,20 +1254,7 @@ export default function HomePage() {
                         />
                         <div className="banner-slide-overlay" />
                         <div className="banner-slide-content">
-                          <span className="banner-badge">{banner.date}</span>
                           <h2 className="banner-title">{banner.title}</h2>
-                          <p className="banner-subtitle">{banner.subtitle}</p>
-                          <button
-                            type="button"
-                            className="banner-cta"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (banner.eventId != null) navigate(`/events/${banner.eventId}`);
-                              else navigate("/events");
-                            }}
-                          >
-                            Lihat Event →
-                          </button>
                         </div>
                       </div>
                     );

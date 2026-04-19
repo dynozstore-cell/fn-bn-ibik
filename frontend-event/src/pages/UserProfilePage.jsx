@@ -6,7 +6,7 @@ import {
   MapPin, Tag, CreditCard, Clock, Trash2, ShieldAlert, Activity,
   ChevronRight, X, Award
 } from 'lucide-react';
-import { getUser, clearAuth, setAuth, getToken } from '../utils/auth';
+import { getUser, clearAuth, setAuth, getToken, logout } from '../utils/auth';
 import { buildApiUrl, defaultHeaders } from '../utils/api';
 import NavbarCustom from '../components/Navbar.jsx';
 import TicketModal from '../components/TicketModal.jsx';
@@ -182,7 +182,7 @@ export default function UserProfilePage() {
   return (
     <>
       <NavbarCustom />
-      <div className="up-page">
+      <div className="up-page page-fade-in">
         {/* Toast */}
         <div className={`up-toast ${toast.msg?'show':''} ${toast.type}`}>
           {toast.type==='success' ? <CheckCircle size={15}/> : <AlertCircle size={15}/>} {toast.msg}
@@ -223,7 +223,7 @@ export default function UserProfilePage() {
                     </button>
                   ))}
                   <div className="up-nav-divider"/>
-                  <button className="up-logout-btn" onClick={async()=>{ if(window.confirm('Yakin ingin keluar?')){ await clearAuth(); nav('/'); }}}>
+                  <button className="up-logout-btn" onClick={async()=>{ if(window.confirm('Yakin ingin keluar?')){ await logout(); nav('/'); }}}>
                     <LogOut size={14}/> Keluar
                   </button>
                 </div>

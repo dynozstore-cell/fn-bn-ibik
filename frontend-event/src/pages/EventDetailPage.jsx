@@ -95,7 +95,7 @@ export default function EventDetailPage() {
 
   if (loading || !event) {
     return (
-      <div className="edp-page">
+      <div className="edp-page page-fade-in">
         <NavbarCustom />
         <main className="edp-loading">
           <div className="edp-spinner" />
@@ -107,7 +107,7 @@ export default function EventDetailPage() {
   }
 
   return (
-    <div className="edp-page">
+    <div className="edp-page page-fade-in">
       <NavbarCustom />
 
       <main key="loaded" className="edp-main page-animate-enter">

@@ -91,7 +91,7 @@ const EventsPage = () => {
   const hasActiveFilter = searchTerm || selectedCategory !== "Semua";
 
   return (
-    <div className="ep-page">
+    <div className="ep-page page-fade-in">
       <NavbarCustom />
 
       <main className="ep-main">

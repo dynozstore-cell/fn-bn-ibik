@@ -15,12 +15,19 @@ use App\Http\Controllers\OTPController;
 use App\Http\Controllers\AdminDashboardController;
 use App\Http\Controllers\PenyelenggaraController;
 use App\Http\Controllers\UploadController;
+use App\Http\Controllers\SettingController;
 
 /*
 |--------------------------------------------------------------------------
 | API Routes
 |--------------------------------------------------------------------------
 */
+
+// ─── Settings Routes ────────────────────────────────────────────────────────
+Route::get('/settings', [SettingController::class, 'index']);
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/settings', [SettingController::class, 'update']);
+});
 
 // ─── Auth Routes (Public) ──────────────────────────────────────────────────
 Route::post('/register',         [AuthController::class, 'register']);

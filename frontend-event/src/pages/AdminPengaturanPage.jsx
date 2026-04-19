@@ -108,8 +108,19 @@ export default function AdminPengaturanPage() {
         }
       } catch (err) { console.error('Fetch kategori error:', err); }
     };
+    const fetchSettings = async () => {
+      try {
+        const res = await fetch(buildApiUrl('/api/settings'));
+        if (res.ok) {
+          const data = await res.json();
+          if (data.homepage_banners) setBannerSlides(data.homepage_banners);
+          if (data.homepage_hero_cards) setHeroCards(data.homepage_hero_cards);
+        }
+      } catch (err) { console.error('Fetch settings error:', err); }
+    };
     fetchBerita();
     fetchKategori();
+    fetchSettings();
   }, []);
 
   const handleSave = async () => {
@@ -145,15 +156,22 @@ export default function AdminPengaturanPage() {
             headers: { ...defaultHeaders, Authorization: `Bearer ${token}` },
             body: JSON.stringify(payload)
           });
-        } else {
-          // Update berita
-          await fetch(buildApiUrl(`/api/berita/${item.id}`), {
-            method: 'PUT',
-            headers: { ...defaultHeaders, Authorization: `Bearer ${token}` },
-            body: JSON.stringify(payload)
-          });
         }
       }
+
+      // Simpan Banner Slides
+      await fetch(buildApiUrl('/api/settings'), {
+        method: 'POST',
+        headers: { ...defaultHeaders, Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ key: 'homepage_banners', value: bannerSlides })
+      });
+
+      // Simpan Hero Cards
+      await fetch(buildApiUrl('/api/settings'), {
+        method: 'POST',
+        headers: { ...defaultHeaders, Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ key: 'homepage_hero_cards', value: heroCards })
+      });
 
       setDeletedNewsIds([]);
       setShowToast(true);
@@ -166,11 +184,29 @@ export default function AdminPengaturanPage() {
     }
   };
 
-  const handleImageUpload = (e, setter, idx, key) => {
+  const handleImageUpload = async (e, setter, idx, key) => {
     const file = e.target.files[0];
     if (!file) return;
-    const url = URL.createObjectURL(file);
-    setter(prev => prev.map((item, i) => i === idx ? { ...item, [key]: url } : item));
+    
+    const formData = new FormData();
+    formData.append('foto_event', file);
+
+    try {
+      const res = await fetch(buildApiUrl('/api/upload-poster'), {
+        method: 'POST',
+        body: formData
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const permanentUrl = data.url;
+        setter(prev => prev.map((item, i) => i === idx ? { ...item, [key]: permanentUrl } : item));
+      } else {
+        alert('Gagal mengupload gambar.');
+      }
+    } catch (err) {
+      console.error('Upload error:', err);
+      alert('Terjadi kesalahan saat upload.');
+    }
   };
 
   /* ---- BANNER HANDLERS ---- */
@@ -221,12 +257,29 @@ export default function AdminPengaturanPage() {
     setEditingNews(newItem);
   };
 
-  const handleNewsImageUpload = (e) => {
+  const handleNewsImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file || !editingNews) return;
-    const url = URL.createObjectURL(file);
-    updateNews(editingNews.id, 'imageUrl', url);
-    setEditingNews(prev => ({ ...prev, imageUrl: url }));
+
+    const formData = new FormData();
+    formData.append('foto_event', file);
+
+    try {
+      const res = await fetch(buildApiUrl('/api/upload-poster'), {
+        method: 'POST',
+        body: formData
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const permanentUrl = data.url;
+        updateNews(editingNews.id, 'imageUrl', permanentUrl);
+        setEditingNews(prev => ({ ...prev, imageUrl: permanentUrl }));
+      } else {
+        alert('Gagal mengupload gambar berita.');
+      }
+    } catch (err) {
+      console.error('Upload error:', err);
+    }
   };
 
   const tabs = [
@@ -296,58 +349,32 @@ export default function AdminPengaturanPage() {
                   </div>
                   <div className="aps-thumb-info">
                     <span className="aps-thumb-title">{slide.title || '(Tanpa Judul)'}</span>
-                    <span className="aps-thumb-date">{slide.date}</span>
                   </div>
                   <button className="aps-thumb-del" onClick={(e) => { e.stopPropagation(); deleteBanner(idx); }}>
                     <Trash2 size={14} />
                   </button>
                 </div>
               ))}
-            </div>
-
-            {/* Slide Editor */}
+            </div>            {/* Slide Editor & Preview */}
             {activeBanner && (
-              <div className="aps-slide-editor">
-                {/* Live Preview */}
-                <div
-                  className="aps-banner-preview"
-                  style={{ background: activeBanner.foto_event_url ? '#0f172a' : 'linear-gradient(135deg,#1e293b,#0f172a)' }}
-                >
-                  {activeBanner.foto_event_url && (
-                    <img src={activeBanner.foto_event_url} alt="Banner" className="aps-banner-bg-img" />
-                  )}
-                  {!activeBanner.foto_event_url && (
-                    <div className="aps-banner-no-img"><ImageIcon size={36} /> Belum ada gambar</div>
-                  )}
-                  <div className="aps-banner-overlay">
-                    <span className="aps-banner-date-badge">{activeBanner.date}</span>
-                    <h3 className="aps-banner-preview-title">{activeBanner.title}</h3>
-                    <p className="aps-banner-preview-sub">{activeBanner.subtitle}</p>
+              <div className="aps-editor-preview-grid">
+                {/* Editor Card */}
+                <div className="aps-editor-card">
+                  <h3 className="aps-editor-title">Detail Slide</h3>
+                  <div className="aps-editor-fields">
+                    <div className="aps-field">
+                      <label><Edit3 size={14} /> Judul Slide</label>
+                      <input className="aps-input" value={activeBanner.title} onChange={e => updateBanner(activeBannerIdx, 'title', e.target.value)} />
+                    </div>
+                    <UploadImageField
+                      label="Foto Banner"
+                      value={activeBanner.foto_event_url}
+                      onUpload={e => handleImageUpload(e, setBannerSlides, activeBannerIdx, 'foto_event_url')}
+                      onRemove={() => updateBanner(activeBannerIdx, 'foto_event_url', '')}
+                    />
                   </div>
-                  <div className="aps-preview-label"><Eye size={14} /> Preview Live</div>
                 </div>
 
-                {/* Form */}
-                <div className="aps-editor-fields">
-                  <div className="aps-field">
-                    <label><Calendar size={14} /> Tanggal Ditampilkan</label>
-                    <input className="aps-input" value={activeBanner.date} onChange={e => updateBanner(activeBannerIdx, 'date', e.target.value)} placeholder="contoh: 22 MAR 2026" />
-                  </div>
-                  <div className="aps-field">
-                    <label><Edit3 size={14} /> Judul Slide</label>
-                    <input className="aps-input" value={activeBanner.title} onChange={e => updateBanner(activeBannerIdx, 'title', e.target.value)} />
-                  </div>
-                  <div className="aps-field">
-                    <label><FileText size={14} /> Deskripsi Singkat</label>
-                    <textarea className="aps-input" rows="2" value={activeBanner.subtitle} onChange={e => updateBanner(activeBannerIdx, 'subtitle', e.target.value)} />
-                  </div>
-                  <UploadImageField
-                    label="Foto Banner"
-                    value={activeBanner.foto_event_url}
-                    onUpload={e => handleImageUpload(e, setBannerSlides, activeBannerIdx, 'foto_event_url')}
-                    onRemove={() => updateBanner(activeBannerIdx, 'foto_event_url', '')}
-                  />
-                </div>
               </div>
             )}
           </div>
