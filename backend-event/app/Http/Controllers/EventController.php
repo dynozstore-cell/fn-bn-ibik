@@ -57,6 +57,15 @@ class EventController extends Controller
             ], 403);
         }
 
+        $request->validate([
+            'event_type' => 'required|in:online,offline',
+            'lokasi' => 'required_if:event_type,offline',
+            'meeting_link' => 'required_if:event_type,online',
+        ], [
+            'lokasi.required_if' => 'Lokasi wajib diisi untuk event offline.',
+            'meeting_link.required_if' => 'Link meeting wajib diisi untuk event online.',
+        ]);
+
         $namaFile = 'default-event.jpg';
 
         if ($request->hasFile('foto_event')) {
@@ -68,13 +77,17 @@ class EventController extends Controller
         $event = Event::create([
             'user_id' => $user->id_user,
             'nama_event' => $request->nama_event,
+            'event_type' => $request->event_type,
             'kategori_id' => $request->kategori_id,
             'deskripsi' => $request->deskripsi,
             'tanggal' => $request->tanggal,
-            'lokasi' => $request->lokasi,
+            'lokasi' => $request->event_type === 'offline' ? $request->lokasi : null,
+            'meeting_link' => $request->event_type === 'online' ? $request->meeting_link : null,
             'harga' => $request->harga ?? 0,
             'foto_event' => $namaFile,
-            'custom_form_schema' => $request->custom_form_schema
+            'custom_form_schema' => $request->custom_form_schema,
+            'metode_pembayaran' => $request->metode_pembayaran,
+            'detail_pembayaran' => $request->detail_pembayaran
         ]);
 
         return response()->json([
@@ -107,6 +120,15 @@ class EventController extends Controller
             ], 403);
         }
 
+        $request->validate([
+            'event_type' => 'sometimes|in:online,offline',
+            'lokasi' => 'required_if:event_type,offline',
+            'meeting_link' => 'required_if:event_type,online',
+        ], [
+            'lokasi.required_if' => 'Lokasi wajib diisi untuk event offline.',
+            'meeting_link.required_if' => 'Link meeting wajib diisi untuk event online.',
+        ]);
+
         $namaFile = $event->foto_event ?: 'default-event.jpg';
 
         if ($request->hasFile('foto_event')) {
@@ -117,13 +139,17 @@ class EventController extends Controller
 
         $event->update([
             'nama_event' => $request->nama_event,
+            'event_type' => $request->event_type ?? $event->event_type,
             'kategori_id' => $request->kategori_id,
             'deskripsi' => $request->deskripsi,
             'tanggal' => $request->tanggal,
-            'lokasi' => $request->lokasi,
+            'lokasi' => ($request->event_type ?? $event->event_type) === 'offline' ? $request->lokasi : null,
+            'meeting_link' => ($request->event_type ?? $event->event_type) === 'online' ? $request->meeting_link : null,
             'harga' => $request->harga ?? $event->harga,
             'foto_event' => $namaFile,
-            'custom_form_schema' => $request->custom_form_schema ?? $event->custom_form_schema
+            'custom_form_schema' => $request->custom_form_schema ?? $event->custom_form_schema,
+            'metode_pembayaran' => $request->metode_pembayaran ?? $event->metode_pembayaran,
+            'detail_pembayaran' => $request->detail_pembayaran ?? $event->detail_pembayaran
         ]);
 
         return response()->json([

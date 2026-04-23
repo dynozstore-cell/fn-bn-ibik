@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Navbar, Nav, Container, Dropdown } from 'react-bootstrap';
-import { Calendar, Menu, X, Loader2, User, LogOut } from 'lucide-react';
+import { Menu, X, Loader2, User, LogOut } from 'lucide-react';
+import LOGO_IBIK from '../assets/LOGO_IBIK.png';
 import { Link, useNavigate } from 'react-router-dom';
 import { getUser, logout } from '../utils/auth';
 
@@ -100,6 +101,34 @@ const NavbarCustom = () => {
 
   return (
     <>
+      <style>{`
+        @media (max-width: 991px) {
+          .profile-dropdown-container {
+            width: 100% !important;
+            margin-top: 10px;
+          }
+          .profile-toggle-custom {
+            width: 100% !important;
+            padding: 12px !important;
+            background: rgba(107, 70, 193, 0.08) !important;
+            border: 1px solid rgba(107, 70, 193, 0.15) !important;
+            border-radius: 12px !important;
+            justify-content: flex-start !important;
+          }
+          .profile-name-mobile {
+            display: block !important;
+            font-size: 1rem !important;
+          }
+          .dropdown-menu-mobile {
+            position: static !important;
+            width: 100% !important;
+            background: rgba(255, 255, 255, 0.03) !important;
+            border: none !important;
+            box-shadow: none !important;
+            margin-top: 5px !important;
+          }
+        }
+      `}</style>
       {/* Logout Overlay */}
       {isLoggingOut && (
         <div className={`logout-overlay ${isFadingOut ? 'fade-out' : ''}`}>
@@ -111,7 +140,7 @@ const NavbarCustom = () => {
               </div>
             </div>
             <h2 className="logout-text">Sedang keluar...</h2>
-            <p className="text-white-50 mt-2">Sampai jumpa lagi di EventHub!</p>
+            <p className="text-white-50 mt-2">Sampai jumpa lagi di KESAVENT!</p>
           </div>
         </div>
       )}
@@ -125,9 +154,13 @@ const NavbarCustom = () => {
       >
         <Container>
           <Navbar.Brand as={Link} to="/" className="d-flex align-items-center">
-          <Calendar size={28} style={{ color: '#6B46C1' }} />
+          <img 
+            src={LOGO_IBIK} 
+            alt="IBIK Logo" 
+            style={{ height: '40px', width: 'auto', marginRight: '10px' }} 
+          />
           <span className="ms-2" style={{ color: '#6B46C1', fontSize: '1.5rem', fontWeight: '700' }}>
-            EventHub
+            KESAVENT
           </span>
         </Navbar.Brand>
         <Navbar.Toggle aria-controls="basic-navbar-nav">
@@ -142,18 +175,22 @@ const NavbarCustom = () => {
           </Nav>
           <div className="d-flex gap-2 ms-lg-3 align-items-center mt-3 mt-lg-0">
             {authUser ? (
-              <Dropdown align="end">
-                <Dropdown.Toggle as="div" className="d-flex align-items-center gap-2 user-select-none" style={{cursor: 'pointer', color: '#6B46C1', fontWeight: '600'}}>
-                  <div className="user-avatar text-white rounded-circle d-flex align-items-center justify-content-center shadow-sm" style={{width: '38px', height: '38px', background: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)'}}>
-                    <User size={20} />
+              <Dropdown align="end" className="profile-dropdown-container">
+                <Dropdown.Toggle as="div" className="d-flex align-items-center gap-2 user-select-none profile-toggle-custom" style={{cursor: 'pointer', color: '#6B46C1', fontWeight: '600'}}>
+                  <div className="user-avatar text-white rounded-circle d-flex align-items-center justify-content-center shadow-sm" style={{width: '38px', height: '38px', background: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)', overflow: 'hidden'}}>
+                    {authUser.avatarUrl ? (
+                      <img src={authUser.avatarUrl} alt="Avatar" style={{width: '100%', height: '100%', objectFit: 'cover'}} />
+                    ) : (
+                      <User size={20} />
+                    )}
                   </div>
-                  <span className="d-none d-lg-block text-truncate" style={{maxWidth: '120px'}}>
+                  <span className="d-none d-lg-block text-truncate profile-name-mobile" style={{maxWidth: '120px'}}>
                     {authUser.nama_lengkap?.split(' ')[0] || 'User'}
                   </span>
                 </Dropdown.Toggle>
                 
                 <Dropdown.Menu 
-                  className="shadow-lg border-0 rounded-4 mt-2 p-1" 
+                  className="shadow-lg border-0 rounded-4 mt-2 p-1 dropdown-menu-mobile"
                   style={{
                     minWidth: '220px', 
                     zIndex: 1050,

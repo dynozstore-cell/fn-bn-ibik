@@ -16,7 +16,7 @@ class PembayaranController extends Controller
         $pembayaran->nama_peserta = optional($user)->nama_lengkap;
         $pembayaran->email_peserta = optional($user)->email;
         $pembayaran->nama_event = optional($event)->nama_event;
-        $pembayaran->nama_metode = optional($pembayaran->metodePembayaran)->nama_metode;
+        $pembayaran->nama_metode = $pembayaran->metode_pembayaran_custom ?: optional($pembayaran->metodePembayaran)->nama_metode;
         
         // Tambahkan data dari pendaftaran
         $pembayaran->custom_form_responses = optional($pendaftaran)->custom_form_responses;
@@ -39,16 +39,39 @@ class PembayaranController extends Controller
 
     public function verifikasi(Request $request, $id)
     {
-        $pembayaran = Pembayaran::find($id);
+        $user = $request->user();
+        $pembayaran = Pembayaran::with('pendaftaran.event')->find($id);
 
-        if(!$pembayaran){
+        if (!$pembayaran) {
             return response()->json([
                 'message' => 'Data pembayaran tidak ditemukan'
-            ],404);
+            ], 404);
+        }
+
+        // Security check: only organizer of the event can verify
+        if ($user->role === 'penyelenggara' && $pembayaran->pendaftaran->event->user_id !== $user->id_user) {
+            return response()->json([
+                'message' => 'Anda tidak memiliki akses untuk memverifikasi pembayaran ini'
+            ], 403);
         }
 
         $pembayaran->status_pembayaran = $request->status_pembayaran;
         $pembayaran->save();
+
+        // Update status pendaftaran jika pembayaran terverifikasi
+        if ($request->status_pembayaran === 'terverifikasi') {
+            $pendaftaran = $pembayaran->pendaftaran;
+            if ($pendaftaran) {
+                $pendaftaran->status_pendaftaran = 'confirmed';
+                $pendaftaran->save();
+            }
+        } elseif ($request->status_pembayaran === 'ditolak') {
+             $pendaftaran = $pembayaran->pendaftaran;
+             if ($pendaftaran) {
+                 $pendaftaran->status_pendaftaran = 'ditolak';
+                 $pendaftaran->save();
+             }
+        }
 
         return response()->json([
             'message' => 'Status pembayaran berhasil diperbarui',
@@ -93,10 +116,13 @@ class PembayaranController extends Controller
         }
 
 
+        $isCustom = !is_numeric($request->metode_pembayaran_id);
+
         $pembayaran = Pembayaran::create([
             'pendaftaran_id' => $request->pendaftaran_id,
             'jumlah_bayar' => $request->jumlah_bayar,
-            'metode_pembayaran_id' => $request->metode_pembayaran_id,
+            'metode_pembayaran_id' => $isCustom ? null : $request->metode_pembayaran_id,
+            'metode_pembayaran_custom' => $isCustom ? $request->metode_pembayaran_id : null,
             'bukti_pembayaran' => $buktiPath,
             'status_pembayaran' => 'pending'
         ]);

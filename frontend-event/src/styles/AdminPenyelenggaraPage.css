@@ -38,7 +38,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: linear-gradient(135deg, #3b82f6, #0ea5e9);
+  background: linear-gradient(135deg, #7c3aed, #0ea5e9);
   color: white;
   border: none;
   padding: 0.6rem 1.2rem;
@@ -47,11 +47,12 @@
   font-size: 0.9rem;
   cursor: pointer;
   transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 4px 15px rgba(124, 58, 237, 0.3);
 }
 
 .apg-btn-add:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.4);
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.4);
 }
 
 /* ---- Charts Row ---- */
@@ -286,9 +287,9 @@
 }
 .apg-btn-cancel:hover { background: rgba(255,255,255,0.05); }
 .apg-btn-submit {
-  background: linear-gradient(135deg, #3b82f6, #0ea5e9); color: white; border: none; padding: 0.6rem 1.2rem; border-radius: 8px; cursor: pointer; font-weight: 600; transition: 0.2s;
+  background: linear-gradient(135deg, #7c3aed, #0ea5e9); color: white; border: none; padding: 0.6rem 1.2rem; border-radius: 8px; cursor: pointer; font-weight: 600; transition: 0.2s; box-shadow: 0 4px 15px rgba(124, 58, 237, 0.3);
 }
-.apg-btn-submit:hover { opacity: 0.9; }
+.apg-btn-submit:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(124, 58, 237, 0.4); opacity: 0.95; }
 
 /* Responsive */
 @media (max-width: 768px) {

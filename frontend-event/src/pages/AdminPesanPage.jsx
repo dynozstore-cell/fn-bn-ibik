@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   Search, Mail, MailOpen, Trash2, Reply,
-  ArrowLeft, Clock, InboxIcon
+  ArrowLeft, Clock, InboxIcon, Copy, Check, Send, CheckCircle
 } from 'lucide-react';
 import { buildApiUrl, defaultHeaders } from '../utils/api';
 import { getToken } from '../utils/auth';
@@ -44,6 +44,9 @@ export default function AdminPesanPage() {
   const [filter, setFilter] = useState('all'); // all | unread | read
   const [selectedId, setSelectedId] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [copiedId, setCopiedId] = useState(null);
+  const [replyText, setReplyText] = useState('');
+  const [isSending, setIsSending] = useState(false);
 
   const token = getToken() || '';
   const authHeaders = { ...defaultHeaders, Authorization: `Bearer ${token}` };
@@ -61,7 +64,9 @@ export default function AdminPesanPage() {
           subjek: k.judul_event || 'Pesan Umum',
           isi: k.pesan || '',
           tanggal: k.created_at,
-          isRead: k.status !== 'pending'
+          isRead: k.status !== 'pending',
+          balasan: k.balasan,
+          repliedAt: k.replied_at
         }));
         setMessages(mapped);
       }
@@ -148,6 +153,45 @@ export default function AdminPesanPage() {
       }
     }
   };
+
+  const handleCopyEmail = (e, email, id) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(email);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleSendReply = async () => {
+    if (!replyText.trim()) return;
+    setIsSending(true);
+    try {
+      const res = await fetch(buildApiUrl(`/api/kontak-event/${selectedId}/reply`), {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({ balasan: replyText })
+      });
+      const result = await res.json();
+      if (res.ok) {
+        setMessages(prev => prev.map(m => m.id === selectedId ? { 
+          ...m, 
+          balasan: replyText, 
+          repliedAt: new Date().toISOString(),
+          isRead: true 
+        } : m));
+        setReplyText('');
+        alert('Balasan berhasil dikirim ke email pengirim!');
+      } else {
+        alert('Gagal mengirim balasan: ' + (result.message || 'Error'));
+      }
+    } catch (e) {
+      console.error('Error sending reply', e);
+      alert('Terjadi kesalahan sistem.');
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+
 
   /* ── JSX ─────────────────────────────────────────────── */
   return (
@@ -327,14 +371,46 @@ export default function AdminPesanPage() {
               ))}
             </div>
 
+            {selectedMessage.balasan ? (
+              <div className="apm-replied-box">
+                <div className="apm-replied-head">
+                  <CheckCircle size={16} /> 
+                  <span>Sudah Dibalas via Email pada {formatFullDate(selectedMessage.repliedAt)}</span>
+                </div>
+                <div className="apm-replied-body">
+                  "{selectedMessage.balasan}"
+                </div>
+              </div>
+            ) : (
+              <div className="apm-reply-section">
+                <h3><Reply size={20} /> Balas Pesan ke Pengirim</h3>
+                <textarea 
+                  placeholder="Ketik balasan profesional Anda di sini... (Email akan otomatis dikirim saat Anda klik kirim)"
+                  value={replyText}
+                  onChange={e => setReplyText(e.target.value)}
+                />
+                <div className="apm-reply-actions">
+                  <div style={{ marginRight: 'auto', display: 'flex', gap: '8px' }}>
+                     <span style={{ fontSize: '0.8rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Mail size={14} /> Terkirim dari: {token ? 'admin@ibik.ac.id' : 'System'}
+                     </span>
+                  </div>
+                  <button 
+                    className="apm-btn-send"
+                    onClick={handleSendReply}
+                    disabled={isSending || !replyText.trim()}
+                  >
+                    {isSending ? <span className="apm-spinner" /> : <Send size={18} />}
+                    <span>{isSending ? 'Sedang Mengirim...' : 'Kirim Balasan Sekarang'}</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="apm-detail-footer">
-              <a
-                href={`mailto:${selectedMessage.email}?subject=Re: ${selectedMessage.subjek}`}
-                className="apm-btn-reply"
-                id="apm-reply-btn"
-              >
-                <Reply size={17} /> Balas via Email
-              </a>
+              <p style={{ fontSize: '0.75rem', color: '#64748b', margin: 0, textAlign: 'center' }}>
+                Pesan ini dikirim melalui sistem otomasi email KESAVENT.
+              </p>
             </div>
           </div>
         </div>

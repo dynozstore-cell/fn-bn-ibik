@@ -23,6 +23,11 @@ function normalizeDetail(event, fallbackId) {
     parsedSchema = event.custom_form_schema ? (typeof event.custom_form_schema === 'string' ? JSON.parse(event.custom_form_schema) : event.custom_form_schema) : [];
   } catch (e) { }
 
+  let parsedMetode = [];
+  try {
+    parsedMetode = event.metode_pembayaran ? (typeof event.metode_pembayaran === 'string' ? JSON.parse(event.metode_pembayaran) : event.metode_pembayaran) : [];
+  } catch (e) { }
+
   return {
     id: event.id || event.id_event,
     title: event.title || event.nama_event || "Untitled Event",
@@ -32,6 +37,7 @@ function normalizeDetail(event, fallbackId) {
     harga: event.harga ?? null,
     foto_event_url: event.foto_event_url || (event.foto_event ? buildApiUrl(`/event/${event.foto_event}`) : FALLBACK_IMAGE),
     custom_form_schema: parsedSchema,
+    metode_pembayaran: Array.isArray(parsedMetode) ? parsedMetode : [],
   };
 }
 
@@ -69,15 +75,21 @@ export default function TicketOrderPage() {
   }, []);
 
   const mockMetode = [
-    { id: 1, nama_metode: 'BCA Virtual Account', nomor_tujuan: '8801 2345 6789', atas_nama: 'EventHub Official' },
-    { id: 2, nama_metode: 'GoPay / QRIS', nomor_tujuan: '0812 3456 7890', atas_nama: 'EventHub' },
-    { id: 3, nama_metode: 'Mandiri Virtual Account', nomor_tujuan: '8902 3456 7890', atas_nama: 'EventHub Official' },
+    { id: 1, nama_metode: 'BCA Virtual Account', nomor_tujuan: '8801 2345 6789', atas_nama: 'KESAVENT Official' },
+    { id: 2, nama_metode: 'GoPay / QRIS', nomor_tujuan: '0812 3456 7890', atas_nama: 'KESAVENT' },
+    { id: 3, nama_metode: 'Mandiri Virtual Account', nomor_tujuan: '8902 3456 7890', atas_nama: 'KESAVENT Official' },
   ];
 
   const userId = authUser?.id_user || authUser?.id || null;
   const totalBayar = Number(form.jumlah_tiket || 0) * Number(form.harga_satuan || 0);
   const isGratis = Number(form.harga_satuan || 0) <= 0;
-  const selectedMetode = metodeList.find((m) => String(m.id || m.id_metode_pembayaran) === String(form.metode_pembayaran_id));
+  
+  // Use event's payment methods if available, otherwise use global ones
+  const effectiveMetodeList = (Array.isArray(event?.metode_pembayaran) && event.metode_pembayaran.length > 0)
+    ? event.metode_pembayaran.map((m) => ({ id: m.nama, nama_metode: m.nama, detail: m.detail }))
+    : metodeList;
+
+  const selectedMetode = effectiveMetodeList.find((m) => String(m.id || m.id_metode_pembayaran) === String(form.metode_pembayaran_id));
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -203,9 +215,13 @@ export default function TicketOrderPage() {
         status_pendaftaran:   isGratis ? "confirmed" : "menunggu_verifikasi",
       });
 
+      const token = getToken();
       const daftarRes = await fetch(buildApiUrl("/api/daftar-event"), {
         method:  "POST",
-        headers: defaultHeaders,
+        headers: {
+          ...defaultHeaders,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body:    daftarBody,
       });
 
@@ -230,7 +246,7 @@ export default function TicketOrderPage() {
         payFormData.append("bukti_pembayaran",    form.bukti_pembayaran);
         payFormData.append("status_pembayaran",   "pending");
 
-        const token = localStorage.getItem("token") || "";
+        const token = getToken();
         const payRes = await fetch(buildApiUrl("/api/pembayaran"), {
           method:  "POST",
           headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -483,27 +499,28 @@ export default function TicketOrderPage() {
                         <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', marginBottom: '8px' }}>Metode Pembayaran</label>
                         <div style={{ position: 'relative' }}>
                           <CreditCard size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
-                          <select
-                            name="metode_pembayaran_id" value={form.metode_pembayaran_id} onChange={onChange}
-                            style={{ width: '100%', background: 'rgba(15,13,26,0.6)', border: '1px solid rgba(255,255,255,0.1)', padding: '14px 16px 14px 44px', borderRadius: '12px', color: form.metode_pembayaran_id ? '#fff' : '#64748b', fontSize: '1rem', outline: 'none', appearance: 'none', cursor: 'pointer' }}
-                            onFocus={e => { e.target.style.borderColor = '#a855f7'; e.target.style.background = 'rgba(15,13,26,0.8)'; }}
-                            onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.background = 'rgba(15,13,26,0.6)'; }}
-                          >
-                            <option value="">Pilih metode pembayaran (Transfer / E-Wallet)</option>
-                            {metodeList.map((m) => (
-                              <option key={m.id || m.id_metode_pembayaran} value={m.id || m.id_metode_pembayaran}>
-                                {m.nama_metode}
-                              </option>
-                            ))}
-                          </select>
+                            <select
+                              name="metode_pembayaran_id" value={form.metode_pembayaran_id} onChange={onChange}
+                              style={{ width: '100%', background: 'rgba(15,13,26,0.6)', border: '1px solid rgba(255,255,255,0.1)', padding: '14px 16px 14px 44px', borderRadius: '12px', color: form.metode_pembayaran_id ? '#fff' : '#64748b', fontSize: '1rem', outline: 'none', appearance: 'none', cursor: 'pointer' }}
+                              onFocus={e => { e.target.style.borderColor = '#a855f7'; e.target.style.background = 'rgba(15,13,26,0.8)'; }}
+                              onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; e.target.style.background = 'rgba(15,13,26,0.6)'; }}
+                            >
+                              <option value="">Pilih metode pembayaran</option>
+                              {effectiveMetodeList.map((m) => (
+                                <option key={m.id || m.id_metode_pembayaran} value={m.id || m.id_metode_pembayaran}>
+                                  {m.nama_metode}
+                                </option>
+                              ))}
+                            </select>
                         </div>
                       </div>
 
                       {selectedMetode && (
-                        <div style={{ background: 'rgba(59,130,246,0.1)', border: '1px dashed rgba(59,130,246,0.3)', padding: '20px', borderRadius: '16px', marginBottom: '24px' }}>
-                          <p style={{ margin: '0 0 12px', fontSize: '0.85rem', color: '#93c5fd' }}>Silakan transfer sesuai nominal ke rekening berikut:</p>
-                          <h3 style={{ margin: '0 0 4px', fontSize: '1.2rem', color: '#fff' }}>{selectedMetode.nama_metode} - {selectedMetode.nomor_tujuan}</h3>
-                          <p style={{ margin: 0, fontSize: '0.9rem', color: '#cbd5e1' }}>A.N. {selectedMetode.atas_nama}</p>
+                        <div style={{ background: 'rgba(168,85,247,0.1)', border: '1px dashed rgba(168,85,247,0.3)', padding: '20px', borderRadius: '16px', marginBottom: '24px' }}>
+                          <p style={{ margin: '0 0 12px', fontSize: '0.85rem', color: '#d8b4fe' }}>Silakan transfer sesuai nominal ke rekening berikut:</p>
+                          <h3 style={{ margin: '0 0 4px', fontSize: '1.2rem', color: '#fff' }}>{selectedMetode.nama_metode} {selectedMetode.nomor_tujuan ? `- ${selectedMetode.nomor_tujuan}` : ''}</h3>
+                          {selectedMetode.atas_nama && <p style={{ margin: '0 0 8px', fontSize: '0.9rem', color: '#cbd5e1' }}>A.N. {selectedMetode.atas_nama}</p>}
+                          {selectedMetode.detail && <p style={{ margin: 0, fontSize: '0.9rem', color: '#cbd5e1', whiteSpace: 'pre-wrap' }}>{selectedMetode.detail}</p>}
                         </div>
                       )}
 

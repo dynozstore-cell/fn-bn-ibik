@@ -437,8 +437,8 @@ export default function PenyelenggaraEventsPage() {
                     </td>
                     <td>
                       <div style={{ display:'flex', gap:8, justifyContent: "flex-end" }}>
-                        <button title="Detail" onClick={() => navigate(`/events/${id}`)} style={{ background:'rgba(14,165,233,0.1)', border:'1px solid rgba(14,165,233,0.2)', color:'#0ea5e9', borderRadius:8, padding:'6px 8px', cursor:'pointer', transition: "all 0.2s" }}><Eye size={14} /></button>
-                        <button title="Edit"   style={{ background:'rgba(124,58,237,0.1)', border:'1px solid rgba(124,58,237,0.2)', color:'#a78bfa', borderRadius:8, padding:'6px 8px', cursor:'pointer', transition: "all 0.2s" }}><Edit2 size={14} /></button>
+                        <button title="Detail" onClick={() => navigate(`/penyelenggara/events/${id}`)} style={{ background:'rgba(14,165,233,0.1)', border:'1px solid rgba(14,165,233,0.2)', color:'#0ea5e9', borderRadius:8, padding:'6px 8px', cursor:'pointer', transition: "all 0.2s" }}><Eye size={14} /></button>
+                        <button title="Edit" onClick={() => navigate(`/penyelenggara/edit-event/${id}`)} style={{ background:'rgba(124,58,237,0.1)', border:'1px solid rgba(124,58,237,0.2)', color:'#a78bfa', borderRadius:8, padding:'6px 8px', cursor:'pointer', transition: "all 0.2s" }}><Edit2 size={14} /></button>
                         <button title="Hapus" onClick={() => confirmDelete(id)} style={{ background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.2)', color:'#f87171', borderRadius:8, padding:'6px 8px', cursor:'pointer', transition: "all 0.2s" }}><Trash2 size={14} /></button>
                       </div>
                     </td>
@@ -487,6 +487,7 @@ export default function PenyelenggaraEventsPage() {
           </div>
         )}
       </div>
+
     </div>
   );
 }

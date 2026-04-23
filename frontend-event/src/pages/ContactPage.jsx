@@ -73,7 +73,7 @@ export default function ContactPage() {
             </h1>
             <p className="contact-hero-sub">
               Kami siap membantu Anda kapan saja. Pilih cara paling nyaman
-              untuk terhubung dengan tim EventHub.
+              untuk terhubung dengan tim KESAVENT.
             </p>
           </div>
         </section>
@@ -126,7 +126,7 @@ export default function ContactPage() {
               <div className="contact-card map-card">
                 <h3>Lokasi Kami</h3>
                 <iframe
-                  title="Lokasi EventHub"
+                  title="Lokasi KESAVENT"
                   src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d15823.450051264697!2d106.8060874!3d-6.5409214!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2e69cbd29a065995%3A0x58135f8ecf78b1d8!2sTajur%2C%20Kabupaten%20Bogor%2C%20Jawa%20Barat%2C%20Indonesia!5e0!3m2!1sen!2sus!4v1700000000000!5m2!1sen!2sus"
                   width="100%"
                   height="210"

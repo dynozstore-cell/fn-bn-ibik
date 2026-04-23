@@ -17,13 +17,42 @@ const INIT_BANNER = [
   { id: 'b4', title: 'Gaming Festival 2026', subtitle: 'Kompetisi game terbesar se-Indonesia', date: '26 APR 2026', foto_event_url: '' },
 ];
 
+const INIT_HERO_HEADER = {
+  title: 'Temukan Event Luar Biasa & Tiket Eksklusif.',
+  subtitle: 'Daftar dan beli tiket event favorit Anda — konser, seminar, workshop — dari berbagai organizer terpercaya dalam satu platform.'
+};
+
 const INIT_HERO_CARDS = [
   { id: 'h1', title: 'Neon Night Festival', price: 'Rp180rb', handle: '@skylineent', imageUrl: '' },
   { id: 'h2', title: 'Digital Summit 2026', price: 'Rp250rb', handle: '@techverse', imageUrl: '' },
   { id: 'h3', title: 'Career & Meditation', price: 'Gratis', handle: '@mindfulid', imageUrl: '' },
 ];
 
-// Removed static INIT_NEWS
+// Helper to match HomePage logic for Hero Cards fallback
+const buildHeroCardsFromEvents = (events) => {
+  if (!events || events.length === 0) return INIT_HERO_CARDS;
+  const sorted = [...events].sort((a, b) => (new Date(b.created_at || 0)) - (new Date(a.created_at || 0)));
+  return sorted.slice(0, 3).map((ev, i) => ({
+    id: `hero-${ev.id}`,
+    title: ev.nama_event || ev.title,
+    price: ev.harga > 0 ? `Rp${Number(ev.harga).toLocaleString('id-ID')}` : 'Gratis',
+    handle: `@${(ev.organizer || 'panitia').replace(/\s+/g, '').toLowerCase()}`,
+    imageUrl: ev.foto_event_url || ''
+  }));
+};
+
+// Helper to match HomePage logic for Banners fallback
+const buildBannerSlidesFromEvents = (events) => {
+  if (!events || events.length === 0) return INIT_BANNER;
+  const sorted = [...events].sort((a, b) => (new Date(b.created_at || 0)) - (new Date(a.created_at || 0)));
+  return sorted.slice(0, 5).map((ev) => ({
+    id: `banner-${ev.id}`,
+    title: ev.nama_event || ev.title,
+    subtitle: (ev.deskripsi || '').slice(0, 100) + '...',
+    date: ev.tanggal ? new Date(ev.tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase() : 'SOON',
+    foto_event_url: ev.foto_event_url || ''
+  }));
+};
 
 /* ================================================================
    MINI COMPONENTS
@@ -68,6 +97,7 @@ export default function AdminPengaturanPage() {
   const [showToast, setShowToast] = useState(false);
 
   // Data states
+  const [heroHeader, setHeroHeader] = useState(INIT_HERO_HEADER);
   const [bannerSlides, setBannerSlides] = useState(INIT_BANNER);
   const [heroCards, setHeroCards] = useState(INIT_HERO_CARDS);
   const [newsItems, setNewsItems] = useState([]);
@@ -79,13 +109,29 @@ export default function AdminPengaturanPage() {
   const [editingNews, setEditingNews] = useState(null); // null or newsItem
 
   useEffect(() => {
-    const fetchBerita = async () => {
+    const fetchData = async () => {
       try {
-        const res = await fetch(buildApiUrl('/api/berita'));
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data)) {
-            setNewsItems(data.map(d => ({
+        // 1. Fetch Events for fallback
+        const eventRes = await fetch(buildApiUrl('/api/event'));
+        let events = [];
+        if (eventRes.ok) {
+          const eData = await eventRes.json();
+          events = Array.isArray(eData?.data) ? eData.data : (Array.isArray(eData) ? eData : []);
+        }
+
+        // 2. Fetch Settings
+        const settingsRes = await fetch(buildApiUrl('/api/settings'));
+        let settings = {};
+        if (settingsRes.ok) {
+          settings = await settingsRes.json();
+        }
+
+        // 3. Fetch Berita
+        const newsRes = await fetch(buildApiUrl('/api/berita'));
+        if (newsRes.ok) {
+          const nData = await newsRes.json();
+          if (Array.isArray(nData)) {
+            setNewsItems(nData.map(d => ({
               id: d.id,
               title: d.judul,
               date: d.tanggal,
@@ -97,37 +143,45 @@ export default function AdminPengaturanPage() {
             })));
           }
         }
-      } catch (err) { console.error('Fetch berita error:', err); }
-    };
-    const fetchKategori = async () => {
-      try {
-        const res = await fetch(buildApiUrl('/api/kategori-berita'));
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data)) setKategoriBerita(data);
+
+        // 4. Fetch Kategori Berita
+        const catRes = await fetch(buildApiUrl('/api/kategori-berita'));
+        if (catRes.ok) {
+          const cData = await catRes.json();
+          if (Array.isArray(cData)) setKategoriBerita(cData);
         }
-      } catch (err) { console.error('Fetch kategori error:', err); }
-    };
-    const fetchSettings = async () => {
-      try {
-        const res = await fetch(buildApiUrl('/api/settings'));
-        if (res.ok) {
-          const data = await res.json();
-          if (data.homepage_banners) setBannerSlides(data.homepage_banners);
-          if (data.homepage_hero_cards) setHeroCards(data.homepage_hero_cards);
+
+        // Apply Settings or Fallback
+        if (settings.homepage_hero_header) {
+          setHeroHeader(settings.homepage_hero_header);
         }
-      } catch (err) { console.error('Fetch settings error:', err); }
+
+        if (settings.homepage_banners) {
+          setBannerSlides(settings.homepage_banners);
+        } else if (events.length > 0) {
+          setBannerSlides(buildBannerSlidesFromEvents(events));
+        }
+
+        if (settings.homepage_hero_cards) {
+          setHeroCards(settings.homepage_hero_cards);
+        } else if (events.length > 0) {
+          setHeroCards(buildHeroCardsFromEvents(events));
+        }
+
+      } catch (err) {
+        console.error('Fetch data error:', err);
+      }
     };
-    fetchBerita();
-    fetchKategori();
-    fetchSettings();
+
+    fetchData();
   }, []);
 
   const handleSave = async () => {
     setIsSaving(true);
+    const token = getToken();
+    
+    // 1. Proses Hapus Berita
     try {
-      const token = getToken();
-      // Proses hapus berita
       for (const id of deletedNewsIds) {
         if (!String(id).startsWith('n')) {
           await fetch(buildApiUrl(`/api/berita/${id}`), {
@@ -136,52 +190,78 @@ export default function AdminPengaturanPage() {
           });
         }
       }
+      setDeletedNewsIds([]);
+    } catch (e) { console.error("Gagal hapus berita:", e); }
 
-      // Proses simpan berita (POST/PUT)
+    // 2. Proses Simpan/Update Berita
+    try {
       for (const item of newsItems) {
         const payload = {
           judul: item.title || 'Judul Baru',
           kategori_id: item.kategori_id || (kategoriBerita[0]?.id || 1),
-          sumber: item.source || 'https://event.com',
+          sumber: item.source || 'https://kesavent.com',
           ringkasan: item.excerpt || 'Ringkasan berita',
           konten: item.excerpt || 'Konten berita',
           gambar: item.imageUrl || null,
-          tanggal: item.date || new Date().toISOString().split('T')[0]
+          tanggal: item.date ? (String(item.date).split('T')[0]) : new Date().toISOString().split('T')[0]
         };
 
         if (String(item.id).startsWith('n')) {
-          // Berita baru
+          // POST baru
           await fetch(buildApiUrl('/api/berita'), {
             method: 'POST',
             headers: { ...defaultHeaders, Authorization: `Bearer ${token}` },
             body: JSON.stringify(payload)
           });
+        } else {
+          // PUT update
+          await fetch(buildApiUrl(`/api/berita/${item.id}`), {
+            method: 'PUT',
+            headers: { ...defaultHeaders, Authorization: `Bearer ${token}` },
+            body: JSON.stringify(payload)
+          });
         }
       }
+    } catch (e) { console.error("Gagal simpan berita:", e); }
 
-      // Simpan Banner Slides
-      await fetch(buildApiUrl('/api/settings'), {
-        method: 'POST',
-        headers: { ...defaultHeaders, Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ key: 'homepage_banners', value: bannerSlides })
-      });
+    // 3. Simpan Pengaturan Lainnya (Header, Banner, Cards)
+    const settingsToSave = [
+      { key: 'homepage_hero_header', value: heroHeader },
+      { key: 'homepage_banners', value: bannerSlides },
+      { key: 'homepage_hero_cards', value: heroCards }
+    ];
 
-      // Simpan Hero Cards
-      await fetch(buildApiUrl('/api/settings'), {
-        method: 'POST',
-        headers: { ...defaultHeaders, Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ key: 'homepage_hero_cards', value: heroCards })
-      });
-
-      setDeletedNewsIds([]);
-      setShowToast(true);
-      setTimeout(() => setShowToast(false), 3000);
-    } catch (err) {
-      console.error('Error saving settings', err);
-      alert('Gagal menyimpan pengaturan.');
-    } finally {
-      setIsSaving(false);
+    for (const setting of settingsToSave) {
+      try {
+        await fetch(buildApiUrl('/api/settings'), {
+          method: 'POST',
+          headers: { ...defaultHeaders, Authorization: `Bearer ${token}` },
+          body: JSON.stringify(setting)
+        });
+      } catch (e) { console.error(`Gagal simpan setting ${setting.key}:`, e); }
     }
+
+    // Refresh news items
+    try {
+      const newsRes = await fetch(buildApiUrl('/api/berita'));
+      if (newsRes.ok) {
+        const nData = await newsRes.json();
+        setNewsItems(nData.map(d => ({
+          id: d.id,
+          title: d.judul,
+          date: d.tanggal,
+          kategori_id: d.kategori_id,
+          category: d.kategori?.nama_kategori || '',
+          source: d.sumber,
+          excerpt: d.ringkasan,
+          imageUrl: d.gambar || ''
+        })));
+      }
+    } catch (e) {}
+
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3000);
+    setIsSaving(false);
   };
 
   const handleImageUpload = async (e, setter, idx, key) => {
@@ -249,7 +329,7 @@ export default function AdminPengaturanPage() {
       date: new Date().toISOString().split('T')[0], 
       kategori_id: defaultKategoriId,
       category: defaultKategoriName, 
-      source: 'https://eventhub.com', 
+      source: 'https://kesavent.com', 
       excerpt: 'Tulis ringkasan berita di sini...', 
       imageUrl: '' 
     };
@@ -283,6 +363,7 @@ export default function AdminPengaturanPage() {
   };
 
   const tabs = [
+    { id: 'header', icon: <FileText size={18} />, label: 'Header Utama' },
     { id: 'banner', icon: <LayoutTemplate size={18} />, label: 'Banner Carousel' },
     { id: 'heroCards', icon: <Ticket size={18} />, label: 'Hero Event Cards' },
     { id: 'berita', icon: <Newspaper size={18} />, label: 'Berita Homepage' },
@@ -318,6 +399,43 @@ export default function AdminPengaturanPage() {
           </button>
         ))}
       </div>
+
+      {/* ============================================================
+          TAB: HEADER UTAMA
+      ============================================================ */}
+      {activeTab === 'header' && (
+        <div className="aps-section fade-in">
+          <div className="aps-section-header">
+            <div>
+              <h2>Kelola Header Utama Beranda</h2>
+              <p>Ubah teks judul dan subjudul besar yang tampil di bagian kiri halaman utama.</p>
+            </div>
+          </div>
+          
+          <div className="aps-editor-card" style={{ maxWidth: '800px' }}>
+            <div className="aps-field">
+              <label><Edit3 size={14} /> Judul Utama (Hero Title)</label>
+              <textarea 
+                className="aps-input" 
+                rows="2"
+                style={{ fontSize: '1.2rem', fontWeight: '700' }}
+                value={heroHeader.title} 
+                onChange={e => setHeroHeader({...heroHeader, title: e.target.value})} 
+              />
+              <small style={{ color: '#64748b' }}>Gunakan &lt;br /&gt; untuk membuat baris baru.</small>
+            </div>
+            <div className="aps-field">
+              <label><FileText size={14} /> Subjudul (Hero Subtitle)</label>
+              <textarea 
+                className="aps-input" 
+                rows="4"
+                value={heroHeader.subtitle} 
+                onChange={e => setHeroHeader({...heroHeader, subtitle: e.target.value})} 
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ============================================================
           TAB: BANNER CAROUSEL
@@ -516,10 +634,7 @@ export default function AdminPengaturanPage() {
                     <input type="date" className="aps-input" value={editingNews.date} onChange={e => { setEditingNews({...editingNews, date: e.target.value}); updateNews(editingNews.id, 'date', e.target.value); }} />
                   </div>
                 </div>
-                <div className="aps-field">
-                  <label>Sumber / Penulis</label>
-                  <input className="aps-input" value={editingNews.source} onChange={e => { setEditingNews({...editingNews, source: e.target.value}); updateNews(editingNews.id, 'source', e.target.value); }} />
-                </div>
+
                 <div className="aps-field">
                   <label>Ringkasan (Excerpt)</label>
                   <textarea className="aps-input" rows="4" value={editingNews.excerpt} onChange={e => { setEditingNews({...editingNews, excerpt: e.target.value}); updateNews(editingNews.id, 'excerpt', e.target.value); }} />

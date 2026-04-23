@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Save, Calendar, MapPin, Users, Tag, FileText, Image, Clock, Plus, Trash2, GripVertical, Settings2, ListPlus, X } from 'lucide-react';
 import '../styles/AdminDashboard.css';
 import { buildApiUrl } from '../utils/api';
@@ -47,9 +48,13 @@ const DEFAULT_CATEGORIES = [
 ];
 
 export default function PenyelenggaraBuatEventPage() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [loadingData, setLoadingData] = useState(false);
   const [form, setForm] = useState({
     nama: '', kategori: '', tanggal: '', waktu_mulai: '', waktu_selesai: '',
-    lokasi: '', kapasitas: '', harga: '', deskripsi: '', poster: '',
+    event_type: 'offline', lokasi: '', meeting_link: '', kapasitas: '', harga: '', deskripsi: '', poster: '',
+    metode_pembayaran: [{ nama: '', detail: '' }],
   });
 
   const [posterPreview, setPosterPreview] = useState(null);
@@ -80,6 +85,50 @@ export default function PenyelenggaraBuatEventPage() {
 
     fetchCategories();
   }, []);
+
+  // Fetch event for editing
+  useEffect(() => {
+    if (id) {
+      const fetchEvent = async () => {
+        setLoadingData(true);
+        try {
+          const res = await fetch(buildApiUrl(`/api/event/${id}`));
+          const data = await res.json();
+          if (res.ok) {
+            setForm({
+              nama: data.nama_event || '',
+              kategori: data.kategori_id || '',
+              tanggal: data.tanggal || '',
+              waktu_mulai: '',
+              waktu_selesai: '',
+              event_type: data.event_type || 'offline',
+              lokasi: data.lokasi || '',
+              meeting_link: data.meeting_link || '',
+              kapasitas: data.kapasitas || 100,
+              harga: data.harga || 0,
+              deskripsi: data.deskripsi || '',
+              poster: data.foto_event || '',
+              metode_pembayaran: Array.isArray(data.metode_pembayaran) ? data.metode_pembayaran : [{ nama: '', detail: '' }],
+            });
+            if (data.foto_event_url) {
+              setPosterPreview(data.foto_event_url);
+            }
+            if (data.custom_form_schema) {
+              try {
+                const schema = typeof data.custom_form_schema === 'string' ? JSON.parse(data.custom_form_schema) : data.custom_form_schema;
+                if (Array.isArray(schema)) setCustomFields(schema);
+              } catch (e) {}
+            }
+          }
+        } catch (e) {
+          console.error(e);
+        } finally {
+          setLoadingData(false);
+        }
+      };
+      fetchEvent();
+    }
+  }, [id]);
 
   const handleChange = e => setForm(p => ({ ...p, [e.target.name]: e.target.value }));
 
@@ -146,8 +195,16 @@ export default function PenyelenggaraBuatEventPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!form.nama || !form.kategori || !form.tanggal || !form.lokasi || !form.kapasitas) {
+    if (!form.nama || !form.kategori || !form.tanggal || !form.kapasitas) {
       alert('Harap isi semua field yang wajib (*)');
+      return;
+    }
+    if (form.event_type === 'offline' && !form.lokasi) {
+      alert('Harap isi lokasi untuk event offline.');
+      return;
+    }
+    if (form.event_type === 'online' && !form.meeting_link) {
+      alert('Harap isi link meeting untuk event online.');
       return;
     }
 
@@ -156,14 +213,21 @@ export default function PenyelenggaraBuatEventPage() {
       formData.append('nama_event', form.nama);
       formData.append('kategori_id', form.kategori);
       formData.append('tanggal', form.tanggal);
-      formData.append('lokasi', form.lokasi);
+      formData.append('event_type', form.event_type);
+      if (form.event_type === 'offline') formData.append('lokasi', form.lokasi);
+      if (form.event_type === 'online') formData.append('meeting_link', form.meeting_link);
       formData.append('deskripsi', form.deskripsi);
       formData.append('harga', form.harga || 0);
       formData.append('custom_form_schema', JSON.stringify(customFields));
+      formData.append('metode_pembayaran', JSON.stringify(form.metode_pembayaran));
 
       // Add poster file if exists
       if (posterFile) {
         formData.append('foto_event', posterFile);
+      }
+
+      if (id) {
+        formData.append('_method', 'PUT');
       }
 
       // Get auth token from utility
@@ -173,7 +237,8 @@ export default function PenyelenggaraBuatEventPage() {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      const response = await fetch(buildApiUrl('/api/event'), {
+      const url = id ? buildApiUrl(`/api/event/${id}`) : buildApiUrl('/api/event');
+      const response = await fetch(url, {
         method: 'POST',
         headers: headers,
         body: formData,
@@ -183,15 +248,20 @@ export default function PenyelenggaraBuatEventPage() {
       console.log('Response:', { status: response.status, body: result });
 
       if (response.ok) {
-        alert('Event berhasil disimpan!');
-        console.log('Event created:', result);
-        // Reset form
-        setForm({
-          nama: '', kategori: '', tanggal: '', waktu_mulai: '', waktu_selesai: '',
-          lokasi: '', kapasitas: '', harga: '', deskripsi: '', poster: '',
-        });
-        setPosterFile(null);
-        setPosterPreview(null);
+        alert(`Event berhasil ${id ? 'diupdate' : 'disimpan'}!`);
+        console.log('Event created/updated:', result);
+        if (!id) {
+          // Reset form
+          setForm({
+            nama: '', kategori: '', tanggal: '', waktu_mulai: '', waktu_selesai: '',
+            event_type: 'offline', lokasi: '', meeting_link: '', kapasitas: '', harga: '', deskripsi: '', poster: '',
+            metode_pembayaran: [{ nama: '', detail: '' }],
+          });
+          setPosterFile(null);
+          setPosterPreview(null);
+        } else {
+          navigate('/penyelenggara/events');
+        }
       } else {
         const errorMsg = result.message || `Error ${response.status}`;
         console.error('API Error:', errorMsg);
@@ -252,17 +322,39 @@ export default function PenyelenggaraBuatEventPage() {
     }));
   };
 
+  const addPaymentMethod = () => {
+    setForm(p => ({
+      ...p,
+      metode_pembayaran: [...p.metode_pembayaran, { nama: '', detail: '' }]
+    }));
+  };
+
+  const removePaymentMethod = (index) => {
+    setForm(p => ({
+      ...p,
+      metode_pembayaran: p.metode_pembayaran.filter((_, i) => i !== index)
+    }));
+  };
+
+  const updatePaymentMethod = (index, field, value) => {
+    setForm(p => {
+      const newMethods = [...p.metode_pembayaran];
+      newMethods[index] = { ...newMethods[index], [field]: value };
+      return { ...p, metode_pembayaran: newMethods };
+    });
+  };
+
   return (
     <div className="adash-wrap">
       <div className="adash-page-header">
         <div>
-          <h1 className="adash-page-title">Buat Event Baru</h1>
-          <p className="adash-page-sub">Lengkapi informasi event yang akan Anda selenggarakan.</p>
+          <h1 className="adash-page-title">{id ? 'Edit Event' : 'Buat Event Baru'}</h1>
+          <p className="adash-page-sub">{id ? 'Perbarui informasi event yang sudah ada.' : 'Lengkapi informasi event yang akan Anda selenggarakan.'}</p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 24, alignItems: 'start' }}>
+        <div className="adash-2col-form">
 
           {/* Main form */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -322,11 +414,27 @@ export default function PenyelenggaraBuatEventPage() {
                       style={inputStyle} onFocus={fieldFocus} onBlur={fieldBlur} />
                   </FormField>
                 </div>
-                <FormField label="Lokasi / Venue *">
-                  <input name="lokasi" value={form.lokasi} onChange={handleChange}
-                    placeholder="Nama gedung, kota, atau 'Online'" required
-                    style={inputStyle} onFocus={fieldFocus} onBlur={fieldBlur} />
+                <FormField label="Tipe Event *">
+                  <select name="event_type" value={form.event_type} onChange={handleChange}
+                    style={selectStyle} onFocus={fieldFocus} onBlur={fieldBlur}>
+                    <option value="offline">Offline (Di Tempat)</option>
+                    <option value="online">Online (Virtual Meeting)</option>
+                  </select>
                 </FormField>
+                {form.event_type === 'offline' && (
+                  <FormField label="Lokasi / Venue *">
+                    <input name="lokasi" value={form.lokasi} onChange={handleChange}
+                      placeholder="Nama gedung, kota, dsb" required
+                      style={inputStyle} onFocus={fieldFocus} onBlur={fieldBlur} />
+                  </FormField>
+                )}
+                {form.event_type === 'online' && (
+                  <FormField label="Link Meeting (Zoom/GMeet) *">
+                    <input name="meeting_link" value={form.meeting_link} onChange={handleChange}
+                      placeholder="https://zoom.us/j/123456789" required
+                      style={inputStyle} onFocus={fieldFocus} onBlur={fieldBlur} />
+                  </FormField>
+                )}
               </div>
             </div>
 
@@ -491,6 +599,47 @@ export default function PenyelenggaraBuatEventPage() {
                     placeholder="0 = Gratis"
                     style={inputStyle} onFocus={fieldFocus} onBlur={fieldBlur} />
                 </FormField>
+
+                {Number(form.harga) > 0 && (
+                  <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <p style={labelStyle}>Metode Pembayaran Peserta</p>
+                    {form.metode_pembayaran.map((m, idx) => (
+                      <div key={idx} style={{ 
+                        padding: 14, borderRadius: 12, background: 'rgba(255,255,255,0.03)', 
+                        border: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: 10,
+                        position: 'relative'
+                      }}>
+                        {form.metode_pembayaran.length > 1 && (
+                          <button type="button" onClick={() => removePaymentMethod(idx)} style={{
+                            position: 'absolute', top: 10, right: 10, background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer'
+                          }}>
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                        <input 
+                          placeholder="Nama Metode (Misal: Bank BCA)" 
+                          value={m.nama} 
+                          onChange={e => updatePaymentMethod(idx, 'nama', e.target.value)}
+                          style={inputStyle} onFocus={fieldFocus} onBlur={fieldBlur} 
+                        />
+                        <textarea 
+                          placeholder="Detail (No. Rekening / Instruksi)" 
+                          value={m.detail} 
+                          onChange={e => updatePaymentMethod(idx, 'detail', e.target.value)}
+                          style={{ ...inputStyle, resize: 'vertical' }} rows={2}
+                          onFocus={fieldFocus} onBlur={fieldBlur} 
+                        />
+                      </div>
+                    ))}
+                    <button type="button" onClick={addPaymentMethod} style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                      padding: '8px', borderRadius: 8, border: '1px dashed rgba(255,255,255,0.2)',
+                      background: 'transparent', color: '#94a3b8', fontSize: '0.85rem', cursor: 'pointer'
+                    }}>
+                      <Plus size={14} /> Tambah Metode
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -558,7 +707,7 @@ export default function PenyelenggaraBuatEventPage() {
               onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 20px rgba(124,58,237,0.4)'; }}
               onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 4px 15px rgba(124,58,237,0.3)'; }}
             >
-              <Save size={17} /> Simpan &amp; Publikasikan
+              <Save size={17} /> {id ? 'Simpan Perubahan' : 'Simpan & Publikasikan'}
             </button>
           </div>
         </div>

@@ -49,9 +49,9 @@
 .aps-subtitle { font-size: 0.95rem; color: #94a3b8; margin: 0.25rem 0 0; }
 
 .aps-btn-save {
-  display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #3b82f6, #0ea5e9); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 12px; font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+  display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #7c3aed, #0ea5e9); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 12px; font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 15px rgba(124, 58, 237, 0.3);
 }
-.aps-btn-save:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4); }
+.aps-btn-save:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(124, 58, 237, 0.4); }
 .aps-btn-save:disabled { opacity: 0.6; cursor: not-allowed; background: #475569; box-shadow: none; }
 
 .aps-spinner {

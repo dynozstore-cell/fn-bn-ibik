@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { getUser } from '../utils/auth';
+import LOGO_IBIK from '../assets/LOGO_IBIK.png';
 import { LayoutDashboard, CalendarDays, Users, ShieldCheck, FileText, MessageSquare, Settings, UserCircle, Menu, X, LogOut } from 'lucide-react';
 import '../styles/AdminPanel.css';
 
@@ -40,10 +41,17 @@ export default function AdminLayout() {
       <div className="bg-circle bg-circle-2"></div>
       <div className="bg-circle bg-circle-3"></div>
 
-      {/* Sidebar */}
       <aside className={`admin-sidebar ${isSidebarOpen ? 'open' : ''}`}>
-        <div className="admin-sidebar-header">
-          EventHub Admin
+        <div className="admin-sidebar-header" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <img src={LOGO_IBIK} alt="Logo" style={{ height: '35px', width: 'auto' }} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span style={{ fontSize: '1.1rem', fontWeight: 700, background: 'linear-gradient(135deg,#a78bfa,#60a5fa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', lineHeight: 1.2 }}>
+              KESAVENT
+            </span>
+            <span style={{ fontSize: '0.72rem', color: 'rgba(148,163,184,0.8)', letterSpacing: '0.08em', textTransform: 'uppercase', lineHeight: 1 }}>
+              Admin
+            </span>
+          </div>
         </div>
         <nav className="admin-nav">
           {navItems.map((item) => (

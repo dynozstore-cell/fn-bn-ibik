@@ -67,18 +67,17 @@ export default function AdminProfilePage() {
   const [activeTab, setActiveTab] = useState('profile');
 
   const [profileData, setProfileData] = useState({
-    name: 'Admin EventHub',
-    email: 'admin@eventhub.com',
+    name: 'Admin KESAVENT',
+    email: 'admin@kesavent.com',
     phone: '081234567890',
-    bio: 'Administrator utama platform EventHub.',
+    bio: 'Administrator utama platform KESAVENT.',
     avatarUrl: '',
   });
 
   const [passwordData, setPasswordData] = useState({
-    currentPassword: '',
-    newPassword: '',
     confirmPassword: '',
   });
+  const [avatarFile, setAvatarFile] = useState(null);
 
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -94,6 +93,8 @@ export default function AdminProfilePage() {
         ...prev,
         name: u.nama_lengkap || u.name || prev.name,
         email: u.email || prev.email,
+        phone: u.no_hp || prev.phone,
+        avatarUrl: u.avatarUrl || prev.avatarUrl,
       }));
     }
   }, []);
@@ -111,7 +112,15 @@ export default function AdminProfilePage() {
 
   const handleAvatarUpload = e => {
     const file = e.target.files[0];
-    if (file) setProfileData(prev => ({ ...prev, avatarUrl: URL.createObjectURL(file) }));
+    if (file) {
+      setAvatarFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProfileData(prev => ({ ...prev, avatarUrl: reader.result }));
+        setEdited(true);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const toast = () => {
@@ -119,17 +128,36 @@ export default function AdminProfilePage() {
     setTimeout(() => setSaveSuccess(false), 3000);
   };
 
-  const handleSaveProfile = e => {
+  const handleSaveProfile = async e => {
     e.preventDefault();
     setIsSaving(true);
-    setTimeout(() => {
-      const u = getUser() || {};
-      const updatedUser = { ...u, name: profileData.name, email: profileData.email };
-      setAuth(getToken(), updatedUser);
-      setIsSaving(false);
+    try {
+      const token = getToken();
+      const formData = new FormData();
+      formData.append('nama_lengkap', profileData.name);
+      formData.append('no_hp', profileData.phone);
+      if (avatarFile) {
+        formData.append('avatar', avatarFile);
+      }
+
+      const res = await fetch(buildApiUrl('/api/user/profile'), {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.message || 'Gagal');
+
+      setAuth(token, d.data);
+      setProfileData(prev => ({ ...prev, avatarUrl: d.data.avatarUrl }));
+      setAvatarFile(null);
       setEdited(false);
       toast();
-    }, 900);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleSavePassword = e => {

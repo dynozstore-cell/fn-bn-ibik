@@ -34,7 +34,9 @@ import PenyelenggaraLaporanPage from './pages/PenyelenggaraLaporanPage';
 import PenyelenggaraRiwayatPage from './pages/PenyelenggaraRiwayatPage';
 import PenyelenggaraProfilePage from './pages/PenyelenggaraProfilePage';
 import PenyelenggaraKonfirmasiPage from './pages/PenyelenggaraKonfirmasiPage';
+import PenyelenggaraEventDetailPage from './pages/PenyelenggaraEventDetailPage';
 import PaymentSuccessPage from './pages/PaymentSuccessPage';
+import PenyelenggaraSertifikatPage from './pages/PenyelenggaraSertifikatPage';
 
 import './App.css';
 
@@ -77,13 +79,15 @@ function App() {
           <Route path="profile"      element={<AdminProfilePage />} />
         </Route>
 
-        {/* Penyelenggara */}
         <Route path="/penyelenggara" element={<PenyelenggaraLayout />}>
           <Route path="dashboard"   element={<PenyelenggaraDashboardPage />} />
           <Route path="events"      element={<PenyelenggaraEventsPage />} />
+          <Route path="events/:id"  element={<PenyelenggaraEventDetailPage />} />
           <Route path="buat-event"  element={<PenyelenggaraBuatEventPage />} />
+          <Route path="edit-event/:id"  element={<PenyelenggaraBuatEventPage />} />
           <Route path="kehadiran"   element={<PenyelenggaraKehadiranPage />} />
           <Route path="laporan"      element={<PenyelenggaraLaporanPage />} />
+          <Route path="sertifikat"   element={<PenyelenggaraSertifikatPage />} />
           <Route path="riwayat"      element={<PenyelenggaraRiwayatPage />} />
           <Route path="konfirmasi"   element={<PenyelenggaraKonfirmasiPage />} />
           <Route path="profile"      element={<PenyelenggaraProfilePage />} />

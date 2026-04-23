@@ -45,7 +45,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me',       [AuthController::class, 'me']);
     
     // User Profile
-    Route::put('/user/profile',   [AuthController::class, 'updateProfile']);
+    Route::post('/user/profile',  [AuthController::class, 'updateProfile']);
     Route::put('/user/password',  [AuthController::class, 'updatePassword']);
     Route::delete('/user/account', [AuthController::class, 'deleteAccount']);
 
@@ -78,6 +78,7 @@ Route::delete('/daftar-event/{id}', [PendaftaranEventController::class, 'destroy
 Route::post('/kontak-event',       [KontakEventController::class, 'store']);
 Route::get('/kontak-event',        [KontakEventController::class, 'index']);
 Route::put('/kontak-event/{id}',   [KontakEventController::class, 'update']);
+Route::post('/kontak-event/{id}/reply', [KontakEventController::class, 'reply']);
 Route::delete('/kontak-event/{id}', [KontakEventController::class, 'destroy']);
 
 
@@ -126,4 +127,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/penyelenggara/{id}', [PenyelenggaraController::class, 'update']);
     Route::put('/penyelenggara/{id}/toggle-status', [PenyelenggaraController::class, 'toggleStatus']);
     Route::delete('/penyelenggara/{id}', [PenyelenggaraController::class, 'destroy']);
+    
+    // ─── Sertifikat Routes ──────────────────────────────────────────────────
+    // Penyelenggara
+    Route::post('/sertifikat/template/{event_id}', [App\Http\Controllers\SertifikatController::class, 'uploadTemplate']);
+    Route::delete('/sertifikat/template/{event_id}', [App\Http\Controllers\SertifikatController::class, 'deleteTemplate']);
+    Route::post('/sertifikat/generate/{event_id}', [App\Http\Controllers\SertifikatController::class, 'generateForEvent']);
+    // User
+    Route::get('/sertifikat/saya', [App\Http\Controllers\SertifikatController::class, 'indexUser']);
 });

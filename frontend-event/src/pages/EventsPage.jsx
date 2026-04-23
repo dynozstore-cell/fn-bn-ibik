@@ -9,6 +9,27 @@ import { buildApiUrl, defaultHeaders } from "../utils/api";
 
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1505373876077-705f7919a43b?w=1200&q=80";
 
+/** Parse date string to Date object for comparison */
+function parseEventDate(dateStr) {
+  if (!dateStr) return null;
+  const d = dateStr.trim();
+  const iso = /^\d{4}-\d{2}-\d{2}/.test(d);
+  if (iso) {
+    return new Date(d + (d.length <= 10 ? "T00:00:00" : ""));
+  }
+  const months = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split(" ");
+  const parts = d.split(/[\s,]+/);
+  if (parts.length >= 3) {
+    const day = parseInt(parts[0], 10);
+    const mi = months.indexOf(parts[1]);
+    const year = parseInt(parts[2], 10);
+    if (!isNaN(day) && mi >= 0 && !isNaN(year)) {
+      return new Date(year, mi, day, 0, 0, 0);
+    }
+  }
+  return new Date(d);
+}
+
 function normalizeEvent(event) {
   return {
     id: event.id || event.id_event,
@@ -45,7 +66,16 @@ const EventsPage = () => {
       .then((res) => res.json())
       .then((data) => {
         const list = (Array.isArray(data) ? data : data?.data || []).map(normalizeEvent);
-        setEvents(list);
+        
+        // Filter out past events
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+        const filtered = list.filter(ev => {
+          const eventDate = parseEventDate(ev.date);
+          return eventDate && eventDate >= now;
+        });
+        
+        setEvents(filtered);
       })
       .catch(() => {
         setEvents([

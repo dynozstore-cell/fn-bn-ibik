@@ -37,11 +37,12 @@ function normalizeDetail(event, fallbackId) {
     title: event.title || event.nama_event || "Untitled Event",
     date: event.date || event.tanggal || "-",
     time: event.waktu || "09:00 - Selesai",
-    location: event.location || event.lokasi || "-",
+    location: event.event_type === 'online' ? 'Event Online' : (event.location || event.lokasi || "-"),
     category: event.category || event.kategori?.nama_kategori || "Event Umum",
     organizer: event.penyelenggara_name || event.organizer || "Panitia Event",
     description: event.description || event.deskripsi || "Deskripsi event belum tersedia.",
     harga: event.harga ?? null,
+    event_type: event.event_type || 'offline',
     foto_event_url:
       event.foto_event_url ||
       (event.foto_event ? buildApiUrl(`/event/${event.foto_event}`) : FALLBACK_IMAGE),
@@ -203,19 +204,21 @@ export default function EventDetailPage() {
                 </ul>
               </div>
 
-              <div>
-                <h3 className="edp-section-title">
-                  <Map size={18} /> Peta Lokasi
-                </h3>
-                <div className="edp-map-wrap">
-                  <iframe
-                    title="Peta Lokasi"
-                    src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d15823.450051264697!2d106.8060874!3d-6.5409214!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2e69cbd29a065995%3A0x58135f8ecf78b1d8!2sTajur%2C%20Kabupaten%20Bogor%2C%20Jawa%20Barat%2C%20Indonesia!5e0!3m2!1sen!2sus!4v1700000000000!5m2!1sen!2sus"
-                    allowFullScreen=""
-                    loading="lazy"
-                  />
+              {event.event_type === 'offline' && (
+                <div>
+                  <h3 className="edp-section-title">
+                    <Map size={18} /> Peta Lokasi
+                  </h3>
+                  <div className="edp-map-wrap">
+                    <iframe
+                      title="Peta Lokasi"
+                      src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d15823.450051264697!2d106.8060874!3d-6.5409214!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2e69cbd29a065995%3A0x58135f8ecf78b1d8!2sTajur%2C%20Kabupaten%20Bogor%2C%20Jawa%20Barat%2C%20Indonesia!5e0!3m2!1sen!2sus!4v1700000000000!5m2!1sen!2sus"
+                      allowFullScreen=""
+                      loading="lazy"
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
 

@@ -108,7 +108,7 @@ export default function AdminPenggunaPage() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "data_pengguna_eventhub.csv");
+    link.setAttribute("download", "data_pengguna_kesavent.csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { Link, useNavigate } from "react-router-dom";
 import "./HomePage.css";
 import "./styles/Footer.css";
 import NavbarCustom from "./components/Navbar.jsx";
 import Footer from "./components/Footer.jsx";
 import { buildApiUrl } from "./utils/api";
-import { CalendarDays, MapPin, User, Share2 } from "lucide-react";
+import { CalendarDays, MapPin, User, Share2, Shield, Award, Activity, CheckCircle } from "lucide-react";
 
 function formatPrice(harga) {
   const n = Number(harga);
@@ -16,9 +17,9 @@ function formatPrice(harga) {
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1505373876077-705f7919a43b?w=1200&q=80";
 
 function slugHandle(text) {
-  if (!text || typeof text !== "string") return "eventhub";
+  if (!text || typeof text !== "string") return "kesavent";
   const s = text.replace(/^@/, "").replace(/\s+/g, "").toLowerCase();
-  return s.slice(0, 24) || "eventhub";
+  return s.slice(0, 24) || "kesavent";
 }
 
 function normalizeEvent(event) {
@@ -382,7 +383,7 @@ const NEWS_DATA = [
     title: "Panduan Cara Memilih Event yang Tepat untuk Anda",
     date: "30 Mar 2026",
     category: "Tips & Tricks",
-    source: "EventPlace Magazine",
+    source: "KESAVENT Magazine",
     excerpt: "Memilih event yang sesuai dengan minat dan kebutuhan penting untuk pengalaman terbaik.",
     content: "Tidak semua event cocok untuk semua orang. Guide lengkap ini membantu Anda menemukan event yang sempurna, mulai dari musik, konferensi, hingga workshop networking.",
     image: "linear-gradient(135deg, #f093fb, #f5576c)",
@@ -392,7 +393,7 @@ const NEWS_DATA = [
     title: "Cerita Sukses: Dari Peserta Event hingga Menjadi Entrepreneur",
     date: "29 Mar 2026",
     category: "Inspirasi",
-    source: "EventPlace Stories",
+    source: "KESAVENT Stories",
     excerpt: "Temui kisah inspiratif dari peserta event yang berhasil mengubah kehidupan mereka.",
     content: "Melalui networking dan pembelajaran di event, banyak individu yang menemukan peluang bisnis mereka. Baca cerita lengkap dari berbagai entrepreneur sukses yang dimulai dari event.",
     image: "linear-gradient(135deg, #4facfe, #00f2fe)",
@@ -449,7 +450,7 @@ function transformBeritaToNews(beritaList) {
     title: berita.judul || "Berita",
     date: berita.tanggal ? new Date(berita.tanggal).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : "-",
     category: berita.kategori?.nama_kategori || "General",
-    source: berita.sumber || "EventPlace",
+    source: berita.sumber || "KESAVENT",
     excerpt: berita.ringkasan || "",
     content: berita.konten || "",
     image: berita.gambar || GRADIENT_COLORS[index % GRADIENT_COLORS.length],
@@ -461,6 +462,10 @@ export default function HomePage() {
   const navigate = useNavigate();
   const [events, setEvents] = useState([]);
   const [newsData, setNewsData] = useState([]);
+  const [heroHeader, setHeroHeader] = useState({
+    title: 'Temukan Event Luar Biasa & Tiket Eksklusif.',
+    subtitle: 'Daftar dan beli tiket event favorit Anda — konser, seminar, workshop — dari berbagai organizer terpercaya dalam satu platform.'
+  });
   const [customBanners, setCustomBanners] = useState([]);
   const [customHeroCards, setCustomHeroCards] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -498,11 +503,16 @@ export default function HomePage() {
   }, [events, latestEvents]);
 
   const transformedNews = useMemo(() => {
-    return transformBeritaToNews(newsData);
+    const result = transformBeritaToNews(newsData);
+    console.log('transformedNews computed - newsData length:', newsData.length, 'transformedNews length:', result.length);
+    return result;
   }, [newsData]);
 
   const newsLoopList = useMemo(() => {
     if (!transformedNews.length) return [];
+    // Jika berita kurang dari 3, tidak perlu duplikasi (infinite loop tidak aktif)
+    if (transformedNews.length < 3) return transformedNews;
+    // Duplikasi 3x untuk kelancaran infinite scroll jika data banyak
     return [...transformedNews, ...transformedNews, ...transformedNews];
   }, [transformedNews]);
 
@@ -543,17 +553,13 @@ export default function HomePage() {
       if (!el) return;
 
       const len = transformedNews.length;
-      let nextIdx = selectedNewsIdx + 1;
+      if (len < 3) return; // Tidak perlu autoplay loop jika berita sedikit
 
+      let nextIdx = selectedNewsIdx + 1;
       // Reset ke tengah jika sudah di akhir loop ketiga
       if (nextIdx >= len * 3) {
         nextIdx = len;
       }
-
-      // Jika berpindah dari loop 2 ke loop 3, kita biarkan saja. 
-      // Nanti onScroll akan memanggil ensureNewsInMiddleLoop untuk me-reset ke tengah.
-      // Tapi untuk "satu per satu", kita cukup geser index-nya.
-
       setSelectedNewsIdx(nextIdx);
 
       const cards = el.querySelectorAll(".news-preview-card");
@@ -575,13 +581,19 @@ export default function HomePage() {
 
     isNewsPausedRef.current = true;
     const len = transformedNews.length;
-    let nextIdx = selectedNewsIdx + dir;
-
-    // Handle bounds
-    if (nextIdx < 0) nextIdx = 0;
-    if (nextIdx >= len * 3) nextIdx = len * 3 - 1;
-
-    setSelectedNewsIdx(nextIdx);
+    if (len < 3) {
+      // Logic sederhana jika berita sedikit
+      let nextIdx = selectedNewsIdx + dir;
+      if (nextIdx < 0) nextIdx = 0;
+      if (nextIdx >= len) nextIdx = len - 1;
+      setSelectedNewsIdx(nextIdx);
+    } else {
+      let nextIdx = selectedNewsIdx + dir;
+      // Handle bounds untuk loop
+      if (nextIdx < 0) nextIdx = 0;
+      if (nextIdx >= len * 3) nextIdx = len * 3 - 1;
+      setSelectedNewsIdx(nextIdx);
+    }
 
     const cards = el.querySelectorAll(".news-preview-card");
     const card = cards[nextIdx];
@@ -693,8 +705,17 @@ export default function HomePage() {
         .then((data) => {
           const list = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
           const mapped = list.map(normalizeEvent);
-          setEvents(mapped);
-          setLatestEvents(mapped);
+          
+          // Filter out past events (show only today or future)
+          const now = new Date();
+          now.setHours(0, 0, 0, 0);
+          const filtered = mapped.filter(ev => {
+            const eventDate = parseEventDate(ev.tanggal || ev.date);
+            return eventDate && eventDate >= now;
+          });
+          
+          setEvents(filtered);
+          setLatestEvents(filtered);
         })
         .catch(() => {}),
 
@@ -706,6 +727,7 @@ export default function HomePage() {
       fetch(buildApiUrl("/api/settings"))
         .then((res) => (res.ok ? res.json() : {}))
         .then((data) => {
+          if (data.homepage_hero_header) setHeroHeader(data.homepage_hero_header);
           if (data.homepage_banners) setCustomBanners(data.homepage_banners);
           if (data.homepage_hero_cards) setCustomHeroCards(data.homepage_hero_cards);
         })
@@ -888,16 +910,23 @@ export default function HomePage() {
       const len = newsData.length;
       if (len === 0) return;
 
-      const cards = el.querySelectorAll(".news-preview-card");
-      const card = cards[len];
-      if (card) {
+      if (len < 3) {
+        // Jika berita sedikit, tampilkan dari index 0
+        setSelectedNewsIdx(0);
         el.style.scrollBehavior = "auto";
-        el.scrollLeft = card.offsetLeft - el.offsetWidth / 2 + card.offsetWidth / 2;
-        setSelectedNewsIdx(len);
-        requestAnimationFrame(() => {
-          el.style.scrollBehavior = "";
-        });
+        el.scrollLeft = 0;
+      } else {
+        const cards = el.querySelectorAll(".news-preview-card");
+        const card = cards[len];
+        if (card) {
+          el.style.scrollBehavior = "auto";
+          el.scrollLeft = card.offsetLeft - el.offsetWidth / 2 + card.offsetWidth / 2;
+          setSelectedNewsIdx(len);
+        }
       }
+      requestAnimationFrame(() => {
+        el.style.scrollBehavior = "";
+      });
     }, 200);
 
     return () => clearTimeout(timer);
@@ -922,6 +951,28 @@ export default function HomePage() {
       if (newsTimer) clearTimeout(newsTimer);
       newsTimer = setTimeout(() => {
         if (!isNewsDraggingRef.current) ensureNewsInMiddleLoop();
+
+        // Update selectedNewsIdx based on scroll position for dots
+        const el = newsCarouselRef.current;
+        if (el && transformedNews.length > 0) {
+          const cards = el.querySelectorAll(".news-preview-card");
+          if (cards.length > 0) {
+            const centerX = el.scrollLeft + el.offsetWidth / 2;
+            let closestIdx = 0;
+            let minDiff = Infinity;
+
+            cards.forEach((card, idx) => {
+              const cardCenter = card.offsetLeft + card.offsetWidth / 2;
+              const diff = Math.abs(centerX - cardCenter);
+              if (diff < minDiff) {
+                minDiff = diff;
+                closestIdx = idx;
+              }
+            });
+
+            setSelectedNewsIdx(closestIdx);
+          }
+        }
       }, 150);
     };
 
@@ -1126,14 +1177,12 @@ export default function HomePage() {
           <div className="hero-bg" aria-hidden="true" />
           <div className="container hero-inner">
             <div className="hero-content">
-              <h1 className="hero-title">
-                Temukan Event Luar Biasa
-                <br />
-                &amp; Tiket Eksklusif.
-              </h1>
+              <h1 
+                className="hero-title"
+                dangerouslySetInnerHTML={{ __html: heroHeader.title.replace(/\n/g, '<br />') }}
+              />
               <p className="hero-subtitle">
-                Daftar dan beli tiket event favorit Anda — konser, seminar,
-                workshop — dari berbagai organizer terpercaya dalam satu platform.
+                {heroHeader.subtitle}
               </p>
               <div className="hero-actions">
                 <button
@@ -1143,23 +1192,20 @@ export default function HomePage() {
                 >
                   Jelajahi Event
                 </button>
-                <button
-                  type="button"
-                  className="btn btn-outline-white"
-                  onClick={() => document.getElementById("event-terbaru")?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                >
-                  Cara Kerja?
-                </button>
               </div>
-              <div className="hero-artists">
-                <div className="hero-avatars">
-                  <div className="hero-avatar" style={{ background: "linear-gradient(135deg,#c4b5fd,#a78bfa)" }} />
-                  <div className="hero-avatar" style={{ background: "linear-gradient(135deg,#a78bfa,#8b5cf6)" }} />
-                  <div className="hero-avatar" style={{ background: "linear-gradient(135deg,#8b5cf6,#7c3aed)" }} />
+              <div className="hero-trust-badges">
+                <div className="trust-badge">
+                  <Shield size={14} className="badge-icon" />
+                  <span>Event Terverifikasi</span>
                 </div>
-                <span className="hero-artists-label">+12k Peserta</span>
-                <span className="hero-rating">4.9</span>
-                <span className="hero-rating-dash">—</span>
+                <div className="trust-badge">
+                  <Award size={14} className="badge-icon" />
+                  <span>Sertifikat Digital</span>
+                </div>
+                <div className="trust-badge">
+                  <CheckCircle size={14} className="badge-icon" />
+                  <span>Pembayaran Aman</span>
+                </div>
               </div>
             </div>
 
@@ -1539,25 +1585,52 @@ export default function HomePage() {
                 }}
                 onTouchEnd={() => {
                   isNewsPausedRef.current = false;
+                  // Re-sync dots after touch ends
+                  setTimeout(() => {
+                    const el = newsCarouselRef.current;
+                    if (el && transformedNews.length > 0) {
+                      const cards = el.querySelectorAll(".news-preview-card");
+                      if (cards.length > 0) {
+                        const centerX = el.scrollLeft + el.offsetWidth / 2;
+                        let closestIdx = 0;
+                        let minDiff = Infinity;
+                        cards.forEach((card, idx) => {
+                          const cardCenter = card.offsetLeft + card.offsetWidth / 2;
+                          const diff = Math.abs(centerX - cardCenter);
+                          if (diff < minDiff) { minDiff = diff; closestIdx = idx; }
+                        });
+                        setSelectedNewsIdx(closestIdx);
+                      }
+                    }
+                  }, 100);
                 }}
                 onTouchMove={(e) => {
-                  const x = e.touches[0].clientX;
-                  const walk = newsStartXRef.current - x;
-                  newsCarouselRef.current.scrollLeft = newsScrollLeftRef.current + walk;
+                  // Allow native scrolling, only pause autoplay
+                  isNewsPausedRef.current = true;
                 }}
               >
                 {newsLoopList.map((news, idx) => {
-                  const len = newsData.length;
-                  const realIdx = idx % len;
-                  const isActive = realIdx === (selectedNewsIdx % len);
+                  const len = newsData.length || transformedNews.length;
+                  const realIdx = len > 0 ? idx % len : 0;
+                  const isActive = len > 0 ? realIdx === (selectedNewsIdx % len) : false;
 
                   return (
                     <article
                       key={`${news.id}-${idx}`}
                       className={`news-preview-card ${isActive ? "news-preview-card--active" : ""}`}
                       onClick={() => {
-                        if (isNewsDraggingRef.current) return;
-                        setSelectedNewsIdx(idx);
+                        if (isNewsDraggingRef.current) {
+                          console.log('Ignoring click - dragging in progress');
+                          return;
+                        }
+                        console.log('News card clicked:', {
+                          title: news.title,
+                          idx: idx,
+                          realIdx: realIdx,
+                          len: len,
+                          transformedNewsLength: transformedNews.length
+                        });
+                        setSelectedNewsIdx(realIdx);
                         setShowNewsDetail(true);
                       }}
                     >
@@ -1574,10 +1647,9 @@ export default function HomePage() {
                         }
                       />
                       <div className="news-preview-info">
-                        <h4 className="news-preview-title">{news.title}</h4>
-                        <p className="news-preview-category">{news.category}</p>
+                        <span className="news-preview-category">{news.category}</span>
+                        <h3 className="news-preview-title">{news.title}</h3>
                         <p className="news-preview-date">{news.date}</p>
-                        <p className="news-preview-excerpt">{news.excerpt}</p>
                       </div>
                     </article>
                   );
@@ -1592,54 +1664,234 @@ export default function HomePage() {
                 ›
               </button>
             </div>
+
+            {/* News Pagination Dots (Mobile optimized) */}
+            <div className="news-dots">
+              {transformedNews.map((_, idx) => {
+                const len = transformedNews.length;
+                const activeIdx = len > 0 ? selectedNewsIdx % len : 0;
+                return (
+                  <button
+                    key={`news-dot-${idx}`}
+                    className={`news-dot ${idx === activeIdx ? "news-dot--active" : ""}`}
+                    onClick={() => {
+                      const el = newsCarouselRef.current;
+                      if (!el) return;
+                      const len = transformedNews.length;
+                      const targetIdx = idx + len; // Scroll to middle loop
+                      setSelectedNewsIdx(targetIdx);
+                      const cards = el.querySelectorAll(".news-preview-card");
+                      const card = cards[targetIdx];
+                      if (card) {
+                        el.scrollTo({
+                          left: card.offsetLeft - el.offsetWidth / 2 + card.offsetWidth / 2,
+                          behavior: "smooth"
+                        });
+                      }
+                    }}
+                    aria-label={`Go to news ${idx + 1}`}
+                  />
+                );
+              })}
+            </div>
           </div>
         </section>
 
-        {/* News Detail Modal */}
-        {showNewsDetail && (() => {
-          const currentNews = newsData[selectedNewsIdx % newsData.length];
-          if (!currentNews) return null;
 
+        {/* News Detail Modal */}
+        {showNewsDetail && createPortal((() => {
+          console.log('=== MODAL CONDITION MET ===');
+          console.log('showNewsDetail:', showNewsDetail);
+          console.log('transformedNews.length:', transformedNews.length);
+          console.log('selectedNewsIdx:', selectedNewsIdx);
+          
+          if (transformedNews.length === 0) {
+            console.warn('No news data!');
+            return null;
+          }
+          
+          const newsIndex = selectedNewsIdx % transformedNews.length;
+          const currentNews = transformedNews[newsIndex];
+          
+          console.log('currentNews:', currentNews);
+          
+          if (!currentNews || !currentNews.title) {
+            console.error('currentNews is invalid!', currentNews);
+            return null;
+          }
+          
           return (
-            <div className="news-detail-overlay" onClick={() => setShowNewsDetail(false)}>
-              <div className="news-detail-modal" onClick={(e) => e.stopPropagation()}>
+            <div 
+              className="news-detail-overlay" 
+              onClick={() => setShowNewsDetail(false)}
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(0, 0, 0, 0.9)',
+                zIndex: 99999,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '20px',
+                overflow: 'auto'
+              }}
+            >
+              <div 
+                className="news-detail-modal"
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  background: '#1e1b2e',
+                  border: '2px solid #a855f7',
+                  borderRadius: '20px',
+                  maxWidth: '1000px',
+                  width: '100%',
+                  maxHeight: '90vh',
+                  display: 'flex',
+                  flexDirection: 'row',
+                  overflow: 'hidden',
+                  position: 'relative',
+                  boxShadow: '0 0 100px rgba(168, 85, 247, 0.5)'
+                }}
+              >
+                {/* Close Button */}
                 <button
                   type="button"
-                  className="news-detail-close"
                   onClick={() => setShowNewsDetail(false)}
-                  aria-label="Close"
+                  style={{
+                    position: 'absolute',
+                    top: '15px',
+                    right: '15px',
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '50%',
+                    background: 'rgba(0,0,0,0.7)',
+                    border: '2px solid #a855f7',
+                    color: '#fff',
+                    fontSize: '24px',
+                    cursor: 'pointer',
+                    zIndex: 100,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
                 >
                   ✕
                 </button>
+                
+                {/* Image Section */}
                 <div
-                  className="news-detail-image"
-                  style={
-                    currentNews.image &&
-                      (currentNews.image.startsWith('http://') || currentNews.image.startsWith('https://'))
-                      ? {
-                        backgroundImage: `url(${currentNews.image})`,
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center',
-                      }
-                      : { background: currentNews.image }
-                  }
+                  style={{
+                    flex: '0 0 45%',
+                    minHeight: '400px',
+                    background: currentNews.image && (currentNews.image.startsWith('http://') || currentNews.image.startsWith('https://'))
+                      ? `url(${currentNews.image}) center/cover no-repeat`
+                      : currentNews.image || 'linear-gradient(135deg, #667eea, #764ba2)',
+                    position: 'relative'
+                  }}
                 />
-                <div className="news-detail-content">
-                  <span className="news-detail-category">{currentNews.category}</span>
-                  <h2 className="news-detail-title">{currentNews.title}</h2>
-                  <div className="news-detail-meta">
-                    <span className="news-detail-source">{currentNews.source}</span>
-                    <span className="news-detail-date">{currentNews.date}</span>
+                
+                {/* Content Section */}
+                <div
+                  style={{
+                    flex: 1,
+                    padding: '40px',
+                    overflowY: 'auto',
+                    position: 'relative',
+                    zIndex: 10
+                  }}
+                >
+                  {/* Category */}
+                  <span style={{
+                    display: 'inline-block',
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    letterSpacing: '1.5px',
+                    color: '#c084fc',
+                    background: 'rgba(168, 85, 247, 0.15)',
+                    padding: '8px 16px',
+                    borderRadius: '999px',
+                    border: '1px solid rgba(168, 85, 247, 0.4)',
+                    marginBottom: '20px'
+                  }}>
+                    {currentNews.category}
+                  </span>
+                  
+                  {/* Title */}
+                  <h2 style={{
+                    fontSize: 'clamp(26px, 5vw, 36px)',
+                    fontWeight: 800,
+                    color: '#ffffff',
+                    margin: '0 0 24px 0',
+                    lineHeight: 1.3,
+                    display: 'block'
+                  }}>
+                    {currentNews.title}
+                  </h2>
+                  
+                  {/* Meta */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '20px',
+                    marginBottom: '28px',
+                    paddingBottom: '24px',
+                    borderBottom: '2px solid rgba(168, 85, 247, 0.2)',
+                    flexWrap: 'wrap'
+                  }}>
+                    <span style={{
+                      background: 'rgba(168, 85, 247, 0.2)',
+                      color: '#c084fc',
+                      padding: '8px 16px',
+                      borderRadius: '8px',
+                      fontWeight: 600,
+                      fontSize: '0.9rem',
+                      border: '1px solid rgba(168, 85, 247, 0.3)'
+                    }}>
+                      {currentNews.source}
+                    </span>
+                    <span style={{
+                      color: '#cbd5e1',
+                      fontSize: '0.95rem',
+                      fontWeight: 500
+                    }}>
+                      {currentNews.date}
+                    </span>
                   </div>
-                  <article className="news-detail-text">{currentNews.content}</article>
+                  
+                  {/* Content */}
+                  <article style={{
+                    color: '#e2e8f0',
+                    fontSize: '1.05rem',
+                    lineHeight: 1.8,
+                    margin: 0,
+                    whiteSpace: 'pre-wrap',
+                    wordWrap: 'break-word',
+                    display: 'block'
+                  }}>
+                    {currentNews.content}
+                  </article>
+                  
+                  {/* Link */}
                   {currentNews.link && (
-                    <div className="mt-3">
+                    <div style={{ marginTop: '24px' }}>
                       <a
                         href={currentNews.link}
                         target="_blank"
                         rel="noreferrer"
-                        className="btn btn-sm btn-outline-primary"
-                        style={{ borderRadius: '8px', padding: '8px 16px' }}
+                        style={{
+                          display: 'inline-block',
+                          padding: '10px 20px',
+                          background: 'rgba(168, 85, 247, 0.2)',
+                          color: '#c084fc',
+                          borderRadius: '8px',
+                          border: '1px solid rgba(168, 85, 247, 0.4)',
+                          textDecoration: 'none',
+                          fontWeight: 600
+                        }}
                       >
                         Baca Selengkapnya di Sumber →
                       </a>
@@ -1649,7 +1901,7 @@ export default function HomePage() {
               </div>
             </div>
           );
-        })()}
+        })(), document.body)}
 
       </main>
 

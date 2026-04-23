@@ -63,6 +63,7 @@ export default function PenyelenggaraProfilePage() {
   const [profileData, setProfileData] = useState({
     name: '', username: '', email: '', phone: '', kategori: '', avatarUrl: '',
   });
+  const [avatarFile, setAvatarFile] = useState(null);
   const [passwordData, setPasswordData] = useState({
     currentPassword: '', newPassword: '', confirmPassword: '',
   });
@@ -106,6 +107,7 @@ export default function PenyelenggaraProfilePage() {
             email:    freshUser.email               || prev.email,
             phone:    freshUser.no_hp               || prev.phone,
             kategori: freshUser.kategori_pendaftar  || prev.kategori,
+            avatarUrl: freshUser.avatarUrl          || prev.avatarUrl,
           }));
           setAuth(token, freshUser);
         }
@@ -123,7 +125,15 @@ export default function PenyelenggaraProfilePage() {
   };
   const handleAvatarUpload = e => {
     const file = e.target.files[0];
-    if (file) setProfileData(prev => ({ ...prev, avatarUrl: URL.createObjectURL(file) }));
+    if (file) {
+      setAvatarFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProfileData(prev => ({ ...prev, avatarUrl: reader.result }));
+        setEdited(true);
+      };
+      reader.readAsDataURL(file);
+    }
   };
   const toast = () => { setSaveSuccess(true); setTimeout(() => setSaveSuccess(false), 3000); };
 
@@ -132,25 +142,25 @@ export default function PenyelenggaraProfilePage() {
     setIsSaving(true); setProfileError('');
     try {
       const token  = getToken() || '';
-      const u      = getUser() || {};
-      const userId = u.id_user || u.id;
+      const formData = new FormData();
+      formData.append('nama_lengkap', profileData.name);
+      formData.append('username', profileData.username);
+      formData.append('no_hp', profileData.phone);
+      if (avatarFile) {
+        formData.append('avatar', avatarFile);
+      }
 
-      const res = await fetch(buildApiUrl(`/api/penyelenggara/${userId}`), {
-        method:  'PUT',
-        headers: { ...defaultHeaders, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          nama_lengkap:       profileData.name,
-          username:           profileData.username,
-          email:              profileData.email,
-          no_hp:              profileData.phone,
-          kategori_pendaftar: profileData.kategori,
-          status: u.email_verified_at ? 'aktif' : 'nonaktif',
-        }),
+      const res = await fetch(buildApiUrl('/api/user/profile'), {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Gagal menyimpan profil');
 
-      setAuth(token, { ...u, nama_lengkap: profileData.name, username: profileData.username, email: profileData.email, no_hp: profileData.phone });
+      setAuth(token, data.data);
+      setProfileData(prev => ({ ...prev, avatarUrl: data.data.avatarUrl }));
+      setAvatarFile(null);
       setEdited(false); toast();
     } catch (err) {
       setProfileError(err.message);

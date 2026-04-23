@@ -18,6 +18,8 @@ class KontakEvent extends Model
         'judul_event',
         'deskripsi_event',
         'pesan',
-        'status'
+        'status',
+        'balasan',
+        'replied_at'
     ];
 }

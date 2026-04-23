@@ -16,6 +16,22 @@ use App\Mail\ResetPasswordMail;
 
 class AuthController extends Controller
 {
+    private function formatUserResponse($user)
+    {
+        return [
+            'id_user'            => $user->id_user,
+            'nama_lengkap'       => $user->nama_lengkap,
+            'username'           => $user->username,
+            'email'              => $user->email,
+            'no_hp'              => $user->no_hp,
+            'kategori_pendaftar' => $user->kategori_pendaftar,
+            'role'               => $user->role,
+            'avatar'             => $user->avatar,
+            'avatarUrl'          => $user->avatar ? url('avatars/' . $user->avatar) : null,
+            'email_verified_at'  => $user->email_verified_at,
+        ];
+    }
+
     /**
      * Register user baru dan kirim OTP ke email
      */
@@ -125,16 +141,7 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'Login berhasil',
-            'data'    => [
-                'id_user'            => $user->id_user,
-                'nama_lengkap'       => $user->nama_lengkap,
-                'username'           => $user->username,
-                'email'              => $user->email,
-                'no_hp'              => $user->no_hp,
-                'kategori_pendaftar' => $user->kategori_pendaftar,
-                'role'               => $user->role,
-                'email_verified_at'  => $user->email_verified_at,
-            ],
+            'data'    => $this->formatUserResponse($user),
             'token'   => $token,
         ]);
     }
@@ -156,19 +163,8 @@ class AuthController extends Controller
      */
     public function me(Request $request)
     {
-        $user = $request->user();
-
         return response()->json([
-            'data' => [
-                'id_user'            => $user->id_user,
-                'nama_lengkap'       => $user->nama_lengkap,
-                'username'           => $user->username,
-                'email'              => $user->email,
-                'no_hp'              => $user->no_hp,
-                'kategori_pendaftar' => $user->kategori_pendaftar,
-                'role'               => $user->role,
-                'email_verified_at'  => $user->email_verified_at,
-            ],
+            'data' => $this->formatUserResponse($request->user()),
         ]);
     }
 
@@ -309,20 +305,38 @@ class AuthController extends Controller
         $user = $request->user();
 
         $validated = $request->validate([
-            'nama_lengkap'       => ['required', 'string', 'max:255'],
-            'no_hp'              => ['nullable', 'string', 'max:15'],
+            'nama_lengkap' => ['required', 'string', 'max:255'],
+            'no_hp'        => ['nullable', 'string', 'max:15'],
+            'avatar'       => ['nullable', 'image', 'mimes:jpeg,png,jpg', 'max:2048'],
         ], [
             'nama_lengkap.required' => 'Nama lengkap wajib diisi',
+            'avatar.image'         => 'File harus berupa gambar',
+            'avatar.mimes'         => 'Format gambar harus jpeg, png, atau jpg',
+            'avatar.max'           => 'Ukuran gambar maksimal 2MB',
         ]);
 
-        $user->update([
+        $updateData = [
             'nama_lengkap' => $validated['nama_lengkap'],
             'no_hp'        => $validated['no_hp'],
-        ]);
+        ];
+
+        if ($request->hasFile('avatar')) {
+            // Hapus avatar lama jika ada
+            if ($user->avatar && file_exists(public_path('avatars/' . $user->avatar))) {
+                unlink(public_path('avatars/' . $user->avatar));
+            }
+
+            $file = $request->file('avatar');
+            $filename = time() . '_' . $user->id_user . '.' . $file->getClientOriginalExtension();
+            $file->move(public_path('avatars'), $filename);
+            $updateData['avatar'] = $filename;
+        }
+
+        $user->update($updateData);
 
         return response()->json([
             'message' => 'Profil berhasil diperbarui',
-            'data'    => $user,
+            'data'    => $this->formatUserResponse($user),
         ]);
     }
 

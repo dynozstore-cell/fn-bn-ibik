@@ -6,6 +6,13 @@ import html2canvas from 'html2canvas';
 export default function TicketModal({ isOpen, onClose, ticketData }) {
   const ticketRef = useRef(null);
   const [downloading, setDownloading] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 640);
+
+  React.useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   if (!isOpen || !ticketData) return null;
 
@@ -21,7 +28,7 @@ export default function TicketModal({ isOpen, onClose, ticketData }) {
       const image = canvas.toDataURL('image/png');
       const link = document.createElement('a');
       link.href = image;
-      link.download = `Tiket_${ticketData.eventName?.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'EventHub'}.png`;
+      link.download = `Tiket_${ticketData.eventName?.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'KESAVENT'}.png`;
       link.click();
     } catch (err) {
       console.error('Failed to download ticket', err);
@@ -61,15 +68,15 @@ export default function TicketModal({ isOpen, onClose, ticketData }) {
         <div ref={ticketRef} style={{ 
           background: 'transparent',
           filter: 'drop-shadow(0 15px 30px rgba(0,0,0,0.4))',
-          display: 'flex', flexDirection: 'row',
+          display: 'flex', flexDirection: isMobile ? 'column' : 'row',
           position: 'relative'
         }}>
           
           {/* TICKET LEFT HALF (QR Code) */}
           <div style={{ 
-            background: '#ffffff', borderRadius: '20px 0 0 20px', padding: '24px',
+            background: '#ffffff', borderRadius: isMobile ? '20px 20px 0 0' : '20px 0 0 20px', padding: '24px',
             position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            minWidth: '220px'
+            minWidth: isMobile ? '100%' : '220px'
           }}>
             {/* Subtle watermark */}
             <Ticket size={110} color="rgba(168,85,247,0.04)" style={{ position: 'absolute', top: '-15px', left: '-15px', transform: 'rotate(-15deg)' }} />
@@ -84,7 +91,7 @@ export default function TicketModal({ isOpen, onClose, ticketData }) {
               position: 'relative', zIndex: 1
             }}>
               <QRCodeSVG 
-                value={String(ticketData.qrValue || 'EVENTHUB-TICKET')} 
+                value={String(ticketData.qrValue || 'KESAVENT-TICKET')} 
                 size={130} 
                 level="H" 
                 bgColor="#ffffff"
@@ -99,34 +106,45 @@ export default function TicketModal({ isOpen, onClose, ticketData }) {
 
           {/* VERTICAL TEAR LINE WITH CUTOUTS */}
           <div style={{ 
-            width: '32px', background: '#ffffff', position: 'relative',
-            display: 'flex', flexDirection: 'column', alignItems: 'center'
+            width: isMobile ? '100%' : '32px', 
+            height: isMobile ? '32px' : 'auto',
+            background: '#ffffff', position: 'relative',
+            display: 'flex', flexDirection: isMobile ? 'row' : 'column', alignItems: 'center'
           }}>
             {/* Top Cutout */}
             <div style={{ 
-              width: '32px', height: '16px', background: '#16131f', 
-              borderRadius: '0 0 16px 16px', position: 'absolute', top: 0,
-              boxShadow: 'inset 0 -2px 4px rgba(0,0,0,0.1)'
+              width: isMobile ? '16px' : '32px', height: isMobile ? '32px' : '16px', background: '#16131f', 
+              borderRadius: isMobile ? '0 16px 16px 0' : '0 0 16px 16px', position: 'absolute', 
+              top: 0, left: 0,
+              boxShadow: isMobile ? 'inset -2px 0 4px rgba(0,0,0,0.1)' : 'inset 0 -2px 4px rgba(0,0,0,0.1)'
             }}></div>
             
             {/* Dashed Line */}
-            <div style={{ flex: 1, borderLeft: '2px dashed #cbd5e1', margin: '20px 0' }}></div>
+            <div style={{ 
+              flex: 1, 
+              borderLeft: isMobile ? 'none' : '2px dashed #cbd5e1', 
+              borderTop: isMobile ? '2px dashed #cbd5e1' : 'none',
+              margin: isMobile ? '0 20px' : '20px 0',
+              width: isMobile ? '100%' : 'auto',
+              height: isMobile ? 'auto' : '100%'
+            }}></div>
             
             {/* Bottom Cutout */}
             <div style={{ 
-              width: '32px', height: '16px', background: '#16131f', 
-              borderRadius: '16px 16px 0 0', position: 'absolute', bottom: 0,
-              boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.1)'
+              width: isMobile ? '16px' : '32px', height: isMobile ? '32px' : '16px', background: '#16131f', 
+              borderRadius: isMobile ? '16px 0 0 16px' : '16px 16px 0 0', position: 'absolute', 
+              bottom: 0, right: 0,
+              boxShadow: isMobile ? 'inset 2px 0 4px rgba(0,0,0,0.1)' : 'inset 0 2px 4px rgba(0,0,0,0.1)'
             }}></div>
           </div>
 
           {/* TICKET RIGHT HALF (Details) */}
           <div style={{ 
-            background: '#ffffff', borderRadius: '0 20px 20px 0', padding: '24px 24px 24px 12px',
+            background: '#ffffff', borderRadius: isMobile ? '0 0 20px 20px' : '0 20px 20px 0', padding: isMobile ? '24px' : '24px 24px 24px 12px',
             flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center'
           }}>
             <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f0d1a', margin: '0 0 16px', lineHeight: 1.2 }}>
-              {ticketData.eventName || 'EventHub Event'}
+              {ticketData.eventName || 'KESAVENT Event'}
             </h2>
 
             <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '16px', border: '1px solid #e2e8f0' }}>
@@ -158,7 +176,9 @@ export default function TicketModal({ isOpen, onClose, ticketData }) {
                   </div>
                   <div>
                     <div style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.5px', marginBottom: '2px' }}>Lokasi</div>
-                    <div style={{ color: '#0f0d1a', fontWeight: 800, fontSize: '0.85rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{ticketData.location || '-'}</div>
+                    <div style={{ color: '#0f0d1a', fontWeight: 800, fontSize: '0.85rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                      {ticketData.event_type === 'online' ? 'Event Online' : (ticketData.location || '-')}
+                    </div>
                   </div>
                 </div>
 
@@ -182,12 +202,12 @@ export default function TicketModal({ isOpen, onClose, ticketData }) {
         </div>
 
         {/* Action Buttons (Not captured in image) */}
-        <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'center' }}>
+        <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'center', gap: '12px' }}>
           <button 
             onClick={handleDownload}
             disabled={downloading}
             style={{
-              width: '100%', padding: '14px', borderRadius: '14px',
+              flex: 1, padding: '14px', borderRadius: '14px',
               background: 'linear-gradient(135deg, #10b981, #059669)', color: '#fff',
               border: 'none', fontWeight: 800, fontSize: '0.95rem', cursor: downloading ? 'not-allowed' : 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
@@ -199,6 +219,26 @@ export default function TicketModal({ isOpen, onClose, ticketData }) {
           >
             <Download size={18} /> {downloading ? 'Memproses...' : 'Unduh Tiket'}
           </button>
+
+          {ticketData.event_type === 'online' && ticketData.meeting_link && (
+            <a 
+              href={ticketData.meeting_link}
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                flex: 1, padding: '14px', borderRadius: '14px',
+                background: 'linear-gradient(135deg, #3b82f6, #2563eb)', color: '#fff',
+                border: 'none', fontWeight: 800, fontSize: '0.95rem', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                transition: 'all 0.3s', boxShadow: '0 8px 20px rgba(59,130,246,0.4)',
+                textDecoration: 'none'
+              }}
+              onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+              onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+            >
+              Gabung Meeting
+            </a>
+          )}
         </div>
 
       </div>

@@ -369,3 +369,52 @@ select option:checked {
   .adash-stat-value { font-size: 1.6rem; }
   .adash-welcome-name { font-size: 1.3rem; }
 }
+
+/* ════════════════════════════════════════════════════════
+   RESPONSIVE LAYOUT CLASSES (ADDED FOR MOBILE SUPPORT)
+════════════════════════════════════════════════════════ */
+.adash-2col-form {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 24px;
+  align-items: start;
+}
+
+.adash-2col-sertif {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 20px;
+  align-items: start;
+}
+
+.adash-table-responsive {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.06);
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 992px) {
+  .adash-2col-form,
+  .adash-2col-sertif {
+    grid-template-columns: 1fr;
+  }
+  
+  .adash-page-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .adash-export-btn {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  /* Make tabs scrollable horizontally on mobile */
+  .adash-chart-tabs {
+    overflow-x: auto;
+    white-space: nowrap;
+    padding-bottom: 5px;
+    -webkit-overflow-scrolling: touch;
+  }
+}

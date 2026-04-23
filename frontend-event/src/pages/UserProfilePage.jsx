@@ -4,7 +4,7 @@ import {
   User, Mail, Phone, Key, LogOut, Camera, Save, CheckCircle,
   Eye, EyeOff, Lock, AlertCircle, Edit3, Info, Ticket, Calendar,
   MapPin, Tag, CreditCard, Clock, Trash2, ShieldAlert, Activity,
-  ChevronRight, X, Award
+  ChevronRight, X, Award, Search, Download, CalendarDays
 } from 'lucide-react';
 import { getUser, clearAuth, setAuth, getToken, logout } from '../utils/auth';
 import { buildApiUrl, defaultHeaders } from '../utils/api';
@@ -41,6 +41,7 @@ function PasswordInput({ name, value, onChange, placeholder, ...rest }) {
 const TABS = [
   { id: 'profil',   icon: <User size={15} />,      label: 'Edit Profil' },
   { id: 'tiket',    icon: <Ticket size={15} />,     label: 'Tiket & Event' },
+  { id: 'sertifikat', icon: <Award size={15} />,     label: 'Sertifikat' },
   { id: 'keamanan', icon: <Key size={15} />,        label: 'Keamanan' },
   { id: 'hapus',    icon: <Trash2 size={15} />,     label: 'Hapus Akun', danger: true },
 ];
@@ -68,8 +69,17 @@ export default function UserProfilePage() {
   const [tickets, setTickets] = useState([]);
   const [loadingT, setLoadingT] = useState(false);
   const [filter, setFilter]   = useState('semua');
+  const [ticketSearch, setTicketSearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
+  
+  const [sertifikats, setSertifikats] = useState([]);
+  const [loadingS, setLoadingS] = useState(false);
+  const [certSearch, setCertSearch] = useState('');
+  const [currentCertPage, setCurrentCertPage] = useState(1);
 
-  const [prof, setProf] = useState({ name:'', email:'', phone:'', kategori:'', avatarUrl:'' });
+  const [prof, setProf] = useState({ name:'', username:'', email:'', phone:'', kategori:'', avatarUrl:'' });
+  const [avatarFile, setAvatarFile] = useState(null);
   const [pw,   setPw]   = useState({ cur:'', nw:'', cf:'' });
   const [delPw, setDelPw] = useState('');
 
@@ -91,7 +101,7 @@ export default function UserProfilePage() {
   useEffect(() => {
     const u = getUser();
     if (!u) { nav('/login'); return; }
-    setProf(p => ({ ...p, name: u.nama_lengkap||'', email: u.email||'', phone: u.no_hp||'', kategori: u.kategori_pendaftar||'' }));
+    setProf(p => ({ ...p, name: u.nama_lengkap||'', username: u.username||'', email: u.email||'', phone: u.no_hp||'', kategori: u.kategori_pendaftar||'', avatarUrl: u.avatarUrl||'' }));
     const token = getToken();
     if (!token) return;
     fetch(buildApiUrl('/api/me'), { headers: { ...defaultHeaders, Authorization: `Bearer ${token}` } })
@@ -99,7 +109,7 @@ export default function UserProfilePage() {
       .then(res => {
         if (!res?.data) return;
         const d = res.data;
-        setProf(p => ({ ...p, name:d.nama_lengkap||p.name, email:d.email||p.email, phone:d.no_hp||p.phone, kategori:d.kategori_pendaftar||p.kategori }));
+        setProf(p => ({ ...p, name:d.nama_lengkap||p.name, username:d.username||p.username, email:d.email||p.email, phone:d.no_hp||p.phone, kategori:d.kategori_pendaftar||p.kategori, avatarUrl: d.avatarUrl || p.avatarUrl }));
         setAuth(token, d);
       }).catch(()=>{});
   }, [nav]);
@@ -119,15 +129,44 @@ export default function UserProfilePage() {
       }).catch(()=>{}).finally(() => setLoadingT(false));
   }, [tab]);
 
+  /* Load certificates */
+  useEffect(() => {
+    if (tab !== 'sertifikat') return;
+    setLoadingS(true);
+    const token = getToken();
+    if (!token) { setLoadingS(false); return; }
+    fetch(buildApiUrl('/api/sertifikat/saya'), { headers: { ...defaultHeaders, Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : { data: [] })
+      .then(res => {
+        setSertifikats(res.data || []);
+      }).catch(()=>{}).finally(() => setLoadingS(false));
+  }, [tab]);
+
   const handleSaveProf = async e => {
     e.preventDefault(); setSaving(true); setProfErr('');
     try {
       const token = getToken();
-      const res = await fetch(buildApiUrl('/api/user/profile'), { method:'PUT', headers:{...defaultHeaders, Authorization:`Bearer ${token}`}, body:JSON.stringify({ nama_lengkap:prof.name, no_hp:prof.phone }) });
+      const formData = new FormData();
+      formData.append('nama_lengkap', prof.name);
+      formData.append('username', prof.username);
+      formData.append('no_hp', prof.phone);
+      if (avatarFile) {
+        formData.append('avatar', avatarFile);
+      }
+
+      const res = await fetch(buildApiUrl('/api/user/profile'), { 
+        method:'POST', 
+        headers:{ Authorization:`Bearer ${token}` }, 
+        body: formData 
+      });
       const d = await res.json();
       if (!res.ok) throw new Error(d.message||'Gagal');
-      const u = getUser(); setAuth(token, {...u, nama_lengkap:prof.name, no_hp:prof.phone});
-      setEdited(false); showToast('Profil berhasil diperbarui!');
+      
+      setAuth(token, d.data);
+      setProf(p => ({ ...p, avatarUrl: d.data.avatarUrl }));
+      setAvatarFile(null);
+      setEdited(false); 
+      showToast('Profil berhasil diperbarui!');
     } catch(err) { setProfErr(err.message); } finally { setSaving(false); }
   };
 
@@ -157,12 +196,21 @@ export default function UserProfilePage() {
     } catch(err) { setDelErr(err.message); } finally { setSaving(false); }
   };
 
-  const visibleTickets = tickets.filter(t => {
-    if (filter==='aktif')    return ['pending','Pending'].includes(t.status_pendaftaran);
-    if (filter==='selesai')  return ['berhasil','success','hadir'].includes(t.status_pendaftaran);
-    if (filter==='berbayar') return Number(t.total_harga)>0;
+  const filteredTickets = tickets.filter(t => {
+    const name = (t.event?.nama_event || t.nama_event || '').toLowerCase();
+    const query = ticketSearch.toLowerCase();
+    const matchesSearch = name.includes(query);
+
+    if (!matchesSearch) return false;
+
+    if (filter === 'aktif')    return ['pending','Pending'].includes(t.status_pendaftaran);
+    if (filter === 'selesai')  return ['berhasil','success','hadir'].includes(t.status_pendaftaran);
+    if (filter === 'berbayar') return Number(t.total_harga)>0;
     return true;
   });
+
+  const totalPages = Math.ceil(filteredTickets.length / itemsPerPage);
+  const pagedTickets = filteredTickets.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const handleLihatTiket = (t) => {
     const tgl = t.event?.tanggal ? new Date(t.event.tanggal).toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'}) : '-';
@@ -172,23 +220,21 @@ export default function UserProfilePage() {
       userName: prof.name || 'User',
       date: tgl,
       location: t.event?.lokasi || '-',
-      ticketCount: t.jumlah_tiket || 1
+      ticketCount: t.jumlah_tiket || 1,
+      event_type: t.event?.event_type || 'offline',
+      meeting_link: t.event?.meeting_link || ''
     });
     setShowTicketModal(true);
   };
-
-  const u = getUser();
 
   return (
     <>
       <NavbarCustom />
       <div className="up-page page-fade-in">
-        {/* Toast */}
         <div className={`up-toast ${toast.msg?'show':''} ${toast.type}`}>
           {toast.type==='success' ? <CheckCircle size={15}/> : <AlertCircle size={15}/>} {toast.msg}
         </div>
 
-        {/* Dynamic Background Elements */}
         <div className="up-bg-elements">
           <div className="up-bg-circle up-bg-circle-1"></div>
           <div className="up-bg-circle up-bg-circle-2"></div>
@@ -196,26 +242,33 @@ export default function UserProfilePage() {
         </div>
 
         <div className="up-wrap">
-          {/* MAIN GRID */}
           <div className="up-grid">
-            {/* LEFT SIDEBAR */}
             <div className="up-left-col">
               <div className="up-profile-card fade-up">
-                {/* Avatar */}
                 <div className="up-avatar-wrap">
                   <div className="up-avatar">
                     {prof.avatarUrl ? <img src={prof.avatarUrl} alt="av"/> : <span>{getInitials(prof.name)}</span>}
                   </div>
                   <label className="up-avatar-btn" title="Ganti Foto">
                     <Camera size={13}/>
-                    <input type="file" accept="image/*" hidden onChange={e=>{ const f=e.target.files[0]; if(f) setProf(p=>({...p,avatarUrl:URL.createObjectURL(f)})); }}/>
+                    <input type="file" accept="image/*" hidden onChange={e=>{ 
+                      const f=e.target.files[0]; 
+                      if(f) {
+                        setAvatarFile(f);
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          setProf(p=>({...p,avatarUrl:reader.result}));
+                          setEdited(true);
+                        };
+                        reader.readAsDataURL(f);
+                      }
+                    }}/>
                   </label>
                 </div>
 
                 <div className="up-profile-name">{prof.name||'User'}</div>
                 <div className="up-profile-role"><Award size={12}/> {prof.kategori||'User'}</div>
 
-                {/* Nav */}
                 <div className="up-nav-tabs">
                   {TABS.map(t => (
                     <button key={t.id} className={`up-nav-btn${tab===t.id?' active':''}${t.danger?' danger':''}`} onClick={()=>setTab(t.id)}>
@@ -228,29 +281,10 @@ export default function UserProfilePage() {
                   </button>
                 </div>
               </div>
-            </div>{/* end up-left-col */}
+            </div>
 
-            {/* RIGHT COLUMN — stats + content stacked */}
             <div className="up-right-col">
-              <div className="up-stats-row fade-up">
-                <div className="up-stat-card">
-                  <div className="up-stat-icon purple"><Ticket size={20}/></div>
-                  <div><div className="up-stat-num">{tickets.length}</div><div className="up-stat-label">Total Event</div></div>
-                </div>
-                <div className="up-stat-card">
-                  <div className="up-stat-icon blue"><Activity size={20}/></div>
-                  <div><div className="up-stat-num">{tickets.filter(t=>['pending','Pending'].includes(t.status_pendaftaran)).length}</div><div className="up-stat-label">Tiket Aktif</div></div>
-                </div>
-                <div className="up-stat-card">
-                  <div className="up-stat-icon green"><CheckCircle size={20}/></div>
-                  <div><div className="up-stat-num">{tickets.filter(t=>['berhasil','success','hadir'].includes(t.status_pendaftaran)).length}</div><div className="up-stat-label">Selesai</div></div>
-                </div>
-              </div>
-
-              {/* CONTENT */}
               <div>
-
-              {/* ═══ PROFIL ═══ */}
               {tab==='profil' && (
                 <div className="up-panel fade-up">
                   <div className="up-panel-head">
@@ -265,6 +299,13 @@ export default function UserProfilePage() {
                         <div className="up-input-wrap">
                           <User size={15} className="up-input-icon"/>
                           <input type="text" className="up-input has-icon" value={prof.name} onChange={e=>{ setProf(p=>({...p,name:e.target.value})); setEdited(true); setProfErr(''); }} placeholder="Nama lengkap Anda" required/>
+                        </div>
+                      </div>
+                      <div className="up-field">
+                        <label>Username</label>
+                        <div className="up-input-wrap">
+                          <Tag size={15} className="up-input-icon"/>
+                          <input type="text" className="up-input has-icon" value={prof.username} onChange={e=>{ setProf(p=>({...p,username:e.target.value})); setEdited(true); setProfErr(''); }} placeholder="Username Anda" required/>
                         </div>
                       </div>
                       <div className="up-field">
@@ -299,62 +340,144 @@ export default function UserProfilePage() {
                 </div>
               )}
 
-              {/* ═══ TIKET & EVENT ═══ */}
               {tab==='tiket' && (
                 <div className="up-panel fade-up">
                   <div className="up-panel-head">
                     <div><h2><Ticket size={18}/> Tiket & Event Saya</h2><p>Semua event yang pernah Anda daftarkan beserta status pembayarannya.</p></div>
                     <span className="up-badge-info">{tickets.length} Event</span>
                   </div>
-                  <div className="up-filters">
-                    {[['semua','Semua'],['aktif','Aktif'],['selesai','Selesai'],['berbayar','Berbayar']].map(([v,l])=>(
-                      <button key={v} className={`up-pill${filter===v?' active':''}`} onClick={()=>setFilter(v)}>{l}</button>
-                    ))}
+                  <div className="up-filters-row">
+                    <div className="up-filters">
+                      {[['semua','Semua'],['aktif','Aktif'],['selesai','Selesai'],['berbayar','Berbayar']].map(([v,l])=>(
+                        <button key={v} className={`up-pill${filter===v?' active':''}`} onClick={()=>{setFilter(v); setCurrentPage(1);}}>{l}</button>
+                      ))}
+                    </div>
+                    <div className="up-ticket-search">
+                      <Search size={16} />
+                      <input 
+                        type="text" 
+                        placeholder="Cari event..." 
+                        value={ticketSearch}
+                        onChange={e => { setTicketSearch(e.target.value); setCurrentPage(1); }}
+                      />
+                    </div>
                   </div>
 
                   {loadingT ? (
                     <div className="up-loading"><span className="up-spinner lg"/><p>Memuat tiket…</p></div>
-                  ) : visibleTickets.length===0 ? (
+                  ) : filteredTickets.length===0 ? (
                     <div className="up-empty">
-                      <Ticket size={48}/><h4>{filter==='semua'?'Belum Ada Tiket':'Tidak Ada Data'}</h4>
-                      <p>{filter==='semua'?'Anda belum mendaftar ke acara apapun.':'Tidak ada tiket dengan filter ini.'}</p>
-                      {filter==='semua' && <button className="up-btn primary sm" onClick={()=>nav('/events')}>Cari Event</button>}
+                      <Ticket size={48}/><h4>{filter==='semua' && !ticketSearch ?'Belum Ada Tiket':'Tidak Ada Data'}</h4>
+                      <p>{filter==='semua' && !ticketSearch ?'Anda belum mendaftar ke acara apapun.':'Tidak ada tiket dengan kriteria ini.'}</p>
+                      {filter==='semua' && !ticketSearch && <button className="up-btn primary sm" onClick={()=>nav('/events')}>Cari Event</button>}
                     </div>
                   ) : (
-                    <div className="up-ticket-list">
-                      {visibleTickets.map(t => {
-                        const rs = getRS(t.status_pendaftaran);
-                        const ps = getPS(getLastPay(t.pembayaran));
-                        const isPaid = Number(t.total_harga)>0;
-                        const tgl = t.event?.tanggal ? new Date(t.event.tanggal).toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'}) : '-';
+                    <>
+                      <div className="up-ticket-grid">
+                        {pagedTickets.map(t => {
+                          const rs = getRS(t.status_pendaftaran);
+                          const isPaid = Number(t.total_harga)>0;
+                          const tgl = t.event?.tanggal ? new Date(t.event.tanggal).toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'}) : '-';
+                          const imgUrl = t.event?.foto_event_url || (t.event?.foto_event ? buildApiUrl(`/event/${t.event.foto_event}`) : "https://images.unsplash.com/photo-1505373876077-705f7919a43b?w=1200&q=80");
+                          
+                          return (
+                            <div key={t.id||t.id_pendaftaran} className="up-ticket-vcard">
+                              <div className="up-ticket-img-wrap">
+                                <img src={imgUrl} alt="poster" onError={e=>e.currentTarget.src="https://images.unsplash.com/photo-1505373876077-705f7919a43b?w=1200&q=80"} />
+                                <span className="up-vcard-tag">Terdaftar</span>
+                              </div>
+                              
+                              <div className="up-vcard-body">
+                                <h4 className="up-vcard-title">{t.event?.nama_event||t.nama_event}</h4>
+                                
+                                <div className="up-vcard-meta">
+                                  <div className="up-vmeta-item">
+                                    <MapPin size={13} />
+                                    <span>{t.event?.lokasi||'-'}</span>
+                                  </div>
+                                  <div className="up-vmeta-item">
+                                    <CalendarDays size={13} />
+                                    <span>{tgl}</span>
+                                  </div>
+                                </div>
+
+                                <div className="up-vcard-status">
+                                  Status: <span style={{color:rs.color}}>{rs.label}</span>
+                                </div>
+
+                                <div className="up-vcard-foot">
+                                  {(!isPaid || getLastPay(t.pembayaran) === 'terverifikasi') ? (
+                                    <button onClick={() => handleLihatTiket(t)} className="up-vbtn-download">
+                                      <Download size={14} /> Download Tiket
+                                    </button>
+                                  ) : (
+                                    <button className="up-vbtn-locked" disabled>
+                                      <Lock size={14} /> Tiket Terkunci
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {totalPages > 1 && (
+                        <div className="up-pagination">
+                          {[...Array(totalPages)].map((_, i) => (
+                            <button
+                              key={i}
+                              className={`up-dot ${currentPage === i + 1 ? 'active' : ''}`}
+                              onClick={() => setCurrentPage(i + 1)}
+                            >
+                              {i + 1}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+
+              {tab==='sertifikat' && (
+                <div className="up-panel fade-up">
+                  <div className="up-panel-head">
+                    <div><h2><Award size={18}/> Sertifikat Saya</h2><p>Sertifikat dari event yang telah Anda hadiri.</p></div>
+                  </div>
+
+                  {loadingS ? (
+                    <div className="up-loading"><span className="up-spinner lg"/><p>Memuat sertifikat…</p></div>
+                  ) : sertifikats.length===0 ? (
+                    <div className="up-empty">
+                      <Award size={40}/>
+                      <h4>Belum ada sertifikat</h4>
+                      <p>Sertifikat akan tersedia setelah event selesai dan Anda terverifikasi hadir.</p>
+                    </div>
+                  ) : (
+                    <div className="up-ticket-grid">
+                      {sertifikats.map((s) => {
+                        const tgl = s.event_date ? new Date(s.event_date).toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'}) : '-';
                         return (
-                          <div key={t.id||t.id_pendaftaran} className="up-ticket-card">
-                            <div className="up-ticket-left"><Activity size={18} color="#a855f7"/></div>
-                            <div className="up-ticket-body">
-                              <div className="up-ticket-top">
-                                <h4>{t.event?.nama_event||t.nama_event||'Event Tidak Diketahui'}</h4>
-                                <div className="up-ticket-badges">
-                                  <span className="up-status-badge" style={{color:rs.color,background:rs.bg}}>{rs.label}</span>
-                                  {isPaid && <span className="up-status-badge" style={{color:ps.color,background:ps.bg}}><CreditCard size={10}/> {ps.label}</span>}
+                          <div key={s.id} className="up-ticket-vcard" style={{ border: '1px solid rgba(168,85,247,0.3)' }}>
+                            <div className="up-vcard-body">
+                              <h4 className="up-vcard-title">{s.event_name}</h4>
+                              <div className="up-vcard-meta">
+                                <div className="up-vmeta-item">
+                                  <CalendarDays size={13} />
+                                  <span>{tgl}</span>
                                 </div>
                               </div>
-                              <div className="up-ticket-meta">
-                                <span><Calendar size={12}/> {tgl}</span>
-                                <span><MapPin size={12}/> {t.event?.lokasi||'-'}</span>
-                                <span><Tag size={12}/> {t.jumlah_tiket||1} Tiket</span>
-                              </div>
-                              <div className="up-ticket-foot">
-                                <div className="up-ticket-price">
-                                  {isPaid ? <><CreditCard size={12}/><strong>Rp {Number(t.total_harga).toLocaleString('id-ID')}</strong></> : <><CheckCircle size={12} color="#10b981"/><span style={{color:'#10b981'}}>Gratis</span></>}
-                                  <span className="up-ticket-date" style={{marginLeft: '10px'}}><Clock size={11}/> {new Date(t.tanggal_daftar).toLocaleDateString('id-ID')}</span>
-                                </div>
-                                <button 
-                                  onClick={() => handleLihatTiket(t)}
-                                  className="up-btn primary sm" 
-                                  style={{ padding: '6px 12px', fontSize: '0.75rem', borderRadius: '8px' }}
+                              <div className="up-vcard-foot" style={{ marginTop: '10px' }}>
+                                <a 
+                                  href={s.sertifikat_url} 
+                                  target="_blank" 
+                                  rel="noreferrer" 
+                                  className="up-vbtn-download" 
+                                  style={{ background: 'linear-gradient(135deg,#9333ea,#7c3aed)', color: '#fff', textDecoration: 'none', display: 'flex', justifyContent: 'center' }}
                                 >
-                                  <Ticket size={12}/> Lihat Tiket
-                                </button>
+                                  <Download size={14} /> Download PDF
+                                </a>
                               </div>
                             </div>
                           </div>
@@ -365,7 +488,6 @@ export default function UserProfilePage() {
                 </div>
               )}
 
-              {/* ═══ KEAMANAN ═══ */}
               {tab==='keamanan' && (
                 <div className="up-panel fade-up">
                   <div className="up-panel-head"><div><h2><Key size={18}/> Keamanan Akun</h2><p>Ganti password untuk menjaga keamanan akun Anda.</p></div></div>
@@ -395,7 +517,6 @@ export default function UserProfilePage() {
                 </div>
               )}
 
-              {/* ═══ HAPUS AKUN ═══ */}
               {tab==='hapus' && (
                 <div className="up-panel fade-up">
                   <div className="up-panel-head"><div><h2 style={{color:'#f87171'}}><ShieldAlert size={18}/> Hapus Akun</h2><p>Tindakan ini bersifat permanen dan tidak dapat dibatalkan.</p></div></div>
@@ -424,13 +545,12 @@ export default function UserProfilePage() {
                 </div>
               )}
 
-              </div>{/* end content div */}
-            </div>{/* end up-right-col */}
-          </div>{/* end up-grid */}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* TICKET POPUP */}
       <TicketModal 
         isOpen={showTicketModal} 
         onClose={() => setShowTicketModal(false)} 

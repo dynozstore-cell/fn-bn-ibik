@@ -9,7 +9,7 @@ const Footer = () => {
           <Col lg={4} md={6}>
             <div className="d-flex align-items-center mb-3">
               <Calendar size={32} color="white" />
-              <span className="ms-2 fw-bold fs-4">EventHub</span>
+              <span className="ms-2 fw-bold fs-4">KESAVENT</span>
             </div>
             <p style={{ opacity: 0.9, lineHeight: 1.7 }}>
               Platform event terpercaya untuk menemukan dan mengikuti berbagai event menarik di Indonesia. 
@@ -43,7 +43,7 @@ const Footer = () => {
             <h5>Hubungi Kami</h5>
             <ul>
               <li className="d-flex align-items-center gap-2">
-                <Mail size={16} /> info@eventhub.id
+                <Mail size={16} /> info@kesavent.com
               </li>
               <li className="d-flex align-items-center gap-2">
                 <Phone size={16} /> +62 21 1234 5678
@@ -56,7 +56,7 @@ const Footer = () => {
         </Row>
         <hr />
         <p className="text-center mb-0" style={{ opacity: 0.8 }}>
-          © 2026 EventHub. All rights reserved. Made with ❤️ in Indonesia
+          © 2026 KESAVENT. All rights reserved. Made with ❤️ in Indonesia
         </p>
       </Container>
     </footer>

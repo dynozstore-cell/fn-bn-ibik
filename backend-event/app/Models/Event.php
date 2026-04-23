@@ -13,17 +13,25 @@ class Event extends Model
     protected $fillable = [
         'user_id',
         'nama_event',
+        'event_type',
         'kategori_id',
         'deskripsi',
         'tanggal',
         'lokasi',
+        'meeting_link',
         'harga',
         'foto_event',
-        'custom_form_schema'
+        'custom_form_schema',
+        'metode_pembayaran',
+        'detail_pembayaran',
+        'sertifikat_template',
+        'sertifikat_config'
     ];
 
     protected $casts = [
         'custom_form_schema' => 'array',
+        'metode_pembayaran' => 'array',
+        'sertifikat_config' => 'array',
     ];
 
     public function kategori()

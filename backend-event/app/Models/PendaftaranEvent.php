@@ -18,7 +18,8 @@ class PendaftaranEvent extends Model
         'total_harga',
         'tanggal_daftar',
         'status_pendaftaran',
-        'custom_form_responses'
+        'custom_form_responses',
+        'sertifikat_url'
     ];
 
     protected $casts = [

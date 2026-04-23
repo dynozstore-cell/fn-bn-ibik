@@ -199,7 +199,7 @@ export default function PenyelenggaraLaporanPage() {
             Menampilkan <strong>{paginatedEvents.length}</strong> dari <strong>{filteredEvents.length}</strong> event
           </div>
 
-          <div className="aep-table-wrap">
+          <div className="aep-table-wrap adash-table-responsive">
             <table className="aep-table">
               <thead>
                 <tr>
