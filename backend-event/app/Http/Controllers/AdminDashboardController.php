@@ -97,7 +97,7 @@ class AdminDashboardController extends Controller
             // Karena tidak ada field kehadiran spesifik, kita asumsikan yang status_pendaftaran = 'success' adalah hadir. 
             // Jika belum ada status success, kita beri nilai 0 atau simulasi (untuk sementara kita hitung yang statusnya success/hadir)
             $hadir = PendaftaranEvent::where('event_id', $ev->id)
-                        ->whereIn('status_pendaftaran', ['success', 'hadir'])
+                        ->whereIn('status_pendaftaran', ['success', 'hadir', 'confirmed'])
                         ->count();
 
             return [
@@ -105,6 +105,7 @@ class AdminDashboardController extends Controller
                 'nama_event' => $ev->nama_event,
                 'penyelenggara' => optional($ev->penyelenggara)->nama_lengkap ?? 'Global Admin',
                 'tanggal' => Carbon::parse($ev->tanggal)->format('Y-m-d'),
+                'kategori' => optional($ev->kategori)->nama_kategori ?? 'Umum',
                 'pendaftar' => $pendaftar,
                 'hadir' => $hadir
             ];

@@ -25,14 +25,7 @@ class PembayaranController extends Controller
         $pembayaran->tanggal_daftar = optional($pendaftaran)->tanggal_daftar;
         $pembayaran->status_pendaftaran = optional($pendaftaran)->status_pendaftaran;
 
-        if ($pembayaran->bukti_pembayaran) {
-            $req = request();
-            $base = rtrim($req->getSchemeAndHttpHost() . $req->getBasePath(), '/');
-            $path = str_replace('\\', '/', ltrim($pembayaran->bukti_pembayaran, '/'));
-            $pembayaran->bukti_pembayaran_url = $base . '/storage/' . $path;
-        } else {
-            $pembayaran->bukti_pembayaran_url = null;
-        }
+        // Bukti pembayaran URL sekarang dihandle otomatis oleh model (accessor)
 
         return $pembayaran;
     }

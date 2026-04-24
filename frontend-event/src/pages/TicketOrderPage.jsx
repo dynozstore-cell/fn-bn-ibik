@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import NavbarCustom from "../components/Navbar.jsx";
 import Footer from "../components/Footer.jsx";
 import { buildApiUrl, defaultHeaders } from "../utils/api";
-import { getUser } from "../utils/auth";
+import { getUser, getToken } from "../utils/auth";
 import { Ticket, CreditCard, UploadCloud, CheckCircle, ArrowLeft, Info, CalendarDays, MapPin, User, ChevronRight } from "lucide-react";
 import TicketModal from "../components/TicketModal.jsx";
 import "../HomePage.css";

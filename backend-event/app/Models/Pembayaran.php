@@ -18,6 +18,15 @@ class Pembayaran extends Model
         'bukti_pembayaran',
         'status_pembayaran'
     ];
+    
+    protected $appends = ['bukti_pembayaran_url'];
+
+    public function getBuktiPembayaranUrlAttribute()
+    {
+        if (!$this->bukti_pembayaran) return null;
+        $path = str_replace('\\', '/', ltrim($this->bukti_pembayaran, '/'));
+        return url('storage/' . $path);
+    }
 
     public function pendaftaran()
     {

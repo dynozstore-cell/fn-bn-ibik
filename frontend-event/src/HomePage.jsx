@@ -26,6 +26,18 @@ function normalizeEvent(event) {
   const tanggal = event.tanggal || event.date || "-";
   const nama = event.nama_event || event.title || "Untitled Event";
   const orgLabel = event.organizer || event.kategori?.nama_kategori || "Panitia Event";
+  
+  let finalFotoUrl = FALLBACK_IMAGE;
+  if (event.foto_event_url) {
+    finalFotoUrl = event.foto_event_url;
+  } else if (event.foto_event) {
+    if (event.foto_event.startsWith("http")) {
+      finalFotoUrl = event.foto_event;
+    } else {
+      finalFotoUrl = buildApiUrl(`/event/${event.foto_event}`);
+    }
+  }
+
   return {
     ...event,
     id: event.id || event.id_event,
@@ -36,9 +48,7 @@ function normalizeEvent(event) {
     lokasi: event.lokasi || event.location || "-",
     organizer: orgLabel,
     handle: event.penyelenggara_handle || `@${slugHandle(orgLabel)}`,
-    foto_event_url:
-      event.foto_event_url ||
-      (event.foto_event ? buildApiUrl(`/event/${event.foto_event}`) : FALLBACK_IMAGE),
+    foto_event_url: finalFotoUrl,
   };
 }
 
@@ -173,7 +183,7 @@ function padHeroCardsToThree(fromApi) {
 
 function buildHeroCardsFromEvents(events) {
   const gradients = HERO_CARDS_FALLBACK.map((c) => c.gradient);
-  if (!events.length) return HERO_CARDS_FALLBACK;
+  if (!events.length) return [];
 
   const sorted = [...events].sort((a, b) => {
     const ca = a.created_at ? new Date(a.created_at).getTime() : 0;
@@ -183,14 +193,20 @@ function buildHeroCardsFromEvents(events) {
   });
 
   const fromApi = sorted.slice(0, 3).map((ev, i) => {
-    const hasPhoto = Boolean(ev.foto_event && String(ev.foto_event).length > 0);
+    let finalUrl = null;
+    if (ev.foto_event_url) {
+      finalUrl = ev.foto_event_url;
+    } else if (ev.foto_event) {
+      finalUrl = ev.foto_event.startsWith("http") ? ev.foto_event : buildApiUrl(`/event/${ev.foto_event}`);
+    }
+
     return {
-      id: `hero-${ev.id}`,
+      id: ev.id || ev.id_event,
       title: ev.nama_event || ev.title || "Event",
       price: formatHeroPrice(ev.harga),
-      handle: ev.handle || `@${slugHandle(ev.organizer || ev.kategori?.nama_kategori || "event")}`,
+      handle: ev.penyelenggara_handle || `@${slugHandle(ev.organizer || ev.kategori?.nama_kategori || "event")}`,
       gradient: gradients[i % gradients.length],
-      imageUrl: hasPhoto ? ev.foto_event_url || null : null,
+      imageUrl: finalUrl,
     };
   });
 
@@ -332,7 +348,7 @@ function truncateBannerText(text, max = 130) {
 /** Slides banner dari event Laravel: terbaru = created_at / id, maksimal 8 slide */
 function buildBannerSlidesFromEvents(events) {
   const gradients = BANNER_CAROUSEL_FALLBACK.map((b) => b.image);
-  if (!events.length) return BANNER_CAROUSEL_FALLBACK;
+  if (!events.length) return [];
 
   const sorted = [...events].sort((a, b) => {
     const ca = a.created_at ? new Date(a.created_at).getTime() : 0;
@@ -354,6 +370,14 @@ function buildBannerSlidesFromEvents(events) {
         .toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })
         .toUpperCase()
       : String(ev.tanggal || "").toUpperCase();
+      
+    let finalUrl = null;
+    if (ev.foto_event_url) {
+      finalUrl = ev.foto_event_url;
+    } else if (ev.foto_event) {
+      finalUrl = ev.foto_event.startsWith("http") ? ev.foto_event : buildApiUrl(`/event/${ev.foto_event}`);
+    }
+
     return {
       id: `banner-${ev.id}`,
       eventId: ev.id,
@@ -361,7 +385,7 @@ function buildBannerSlidesFromEvents(events) {
       subtitle,
       date: dateBadge,
       image: gradients[i % gradients.length],
-      foto_event_url: ev.foto_event_url || null,
+      foto_event_url: finalUrl,
     };
   });
 }
@@ -499,7 +523,7 @@ export default function HomePage() {
   const latestList = useMemo(() => {
     const list = latestEvents.length ? latestEvents : events;
     const normalized = Array.isArray(list) ? list : [];
-    return normalized.length ? normalized : DEMO_LATEST_EVENTS;
+    return normalized;
   }, [events, latestEvents]);
 
   const transformedNews = useMemo(() => {

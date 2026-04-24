@@ -27,6 +27,17 @@ class Event extends Model
         'sertifikat_template',
         'sertifikat_config'
     ];
+    
+    protected $appends = ['foto_event_url'];
+
+    public function getFotoEventUrlAttribute()
+    {
+        if (!$this->foto_event) return null;
+        if (filter_var($this->foto_event, FILTER_VALIDATE_URL)) {
+            return $this->foto_event;
+        }
+        return url('event/' . $this->foto_event);
+    }
 
     protected $casts = [
         'custom_form_schema' => 'array',

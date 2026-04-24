@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\User;
 use App\Models\Event;
 use App\Models\PendaftaranEvent;
+use App\Models\Pembayaran;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Hash;
@@ -246,6 +247,7 @@ class PenyelenggaraController extends Controller
      */
     public function destroy($id)
     {
+        \Log::info("Attempting to delete penyelenggara ID: " . $id);
         $penyelenggara = User::where('role', 'penyelenggara')->find($id);
 
         if (!$penyelenggara) {
@@ -254,10 +256,45 @@ class PenyelenggaraController extends Controller
             ], 404);
         }
 
-        $penyelenggara->delete();
+        // Manual Cascade Deletion
+        DB::beginTransaction();
+        try {
+            // 1. Cari semua event yang diselenggarakan oleh user ini
+            $events = Event::where('user_id', $id)->get();
 
-        return response()->json([
-            'message' => 'Penyelenggara berhasil dihapus'
-        ], 200);
+            foreach ($events as $event) {
+                // a. Ambil pendaftaran untuk event ini
+                $pendaftaranIds = PendaftaranEvent::where('event_id', $event->id)->pluck('id');
+                // b. Hapus pembayaran terkait
+                Pembayaran::whereIn('pendaftaran_id', $pendaftaranIds)->delete();
+                // c. Hapus pendaftaran terkait
+                PendaftaranEvent::where('event_id', $event->id)->delete();
+                // d. Hapus event itu sendiri
+                $event->delete();
+            }
+
+            // 2. Hapus data lain yang terkait dengan user ini sebagai peserta/umum
+            // a. Hapus pendaftaran di mana user ini adalah peserta
+            $pendaftaranUserIds = PendaftaranEvent::where('user_id', $id)->pluck('id');
+            Pembayaran::whereIn('pendaftaran_id', $pendaftaranUserIds)->delete();
+            PendaftaranEvent::where('user_id', $id)->delete();
+
+            // b. Hapus OTP
+            DB::table('otp_verifications')->where('email', $penyelenggara->email)->delete();
+
+            // 3. Hapus penyelenggara
+            $penyelenggara->delete();
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Penyelenggara berhasil dihapus'
+            ], 200);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Gagal menghapus penyelenggara: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }

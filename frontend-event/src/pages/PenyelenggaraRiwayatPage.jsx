@@ -64,8 +64,10 @@ export default function PenyelenggaraRiwayatPage() {
     const fetchEvents = async () => {
       try {
         const res = await fetch(buildApiUrl('/api/admin/laporan'), { headers: authHeaders });
+        console.log('Riwayat fetch status:', res.status);
         if (res.ok) {
           const data = await res.json();
+          console.log('Riwayat data received:', data);
           if (data.status === 'success') {
             const now = new Date();
             // Hanya ambil event yang SUDAH SELESAI (tanggal < sekarang)

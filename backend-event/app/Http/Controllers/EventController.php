@@ -4,13 +4,17 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Event;
+use App\Models\PendaftaranEvent;
+use App\Models\Pembayaran;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class EventController extends Controller
 {
     private function transformEvent($event)
     {
-        $event->foto_event_url = $event->foto_event ? url('event/' . $event->foto_event) : null;
+        // foto_event_url sekarang dihandle otomatis oleh model (accessor)
+        
         $event->category = optional($event->kategori)->nama_kategori ?? 'Tanpa Kategori';
         $event->penyelenggara_name = optional($event->penyelenggara)->nama_lengkap ?? 'Admin';
         return $event;
@@ -161,6 +165,7 @@ class EventController extends Controller
     // DELETE
     public function destroy($id)
     {
+        \Log::info("Attempting to delete event ID: " . $id);
         $user = Auth::user();
         if (!$user || !in_array($user->role, ['admin', 'penyelenggara'])) {
             return response()->json([
@@ -182,10 +187,31 @@ class EventController extends Controller
             ], 403);
         }
 
-        $event->delete();
+        // Manual Cascade Deletion
+        DB::beginTransaction();
+        try {
+            // 1. Ambil semua pendaftaran untuk event ini
+            $pendaftaranIds = PendaftaranEvent::where('event_id', $id)->pluck('id');
 
-        return response()->json([
-            'message' => 'Event berhasil dihapus'
-        ], 200);
+            // 2. Hapus semua pembayaran terkait pendaftaran tersebut
+            Pembayaran::whereIn('pendaftaran_id', $pendaftaranIds)->delete();
+
+            // 3. Hapus semua pendaftaran
+            PendaftaranEvent::where('event_id', $id)->delete();
+
+            // 4. Hapus event
+            $event->delete();
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Event berhasil dihapus'
+            ], 200);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Gagal menghapus event: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }

@@ -32,6 +32,18 @@ function normalizeDetail(event, fallbackId) {
   if (!event) {
     return fallbackEvents.find(e => String(e.id) === String(fallbackId)) || fallbackEvents[0];
   }
+
+  let finalFotoUrl = FALLBACK_IMAGE;
+  if (event.foto_event_url) {
+    finalFotoUrl = event.foto_event_url;
+  } else if (event.foto_event) {
+    if (event.foto_event.startsWith("http")) {
+      finalFotoUrl = event.foto_event;
+    } else {
+      finalFotoUrl = buildApiUrl(`/event/${event.foto_event}`);
+    }
+  }
+
   return {
     id: event.id || event.id_event,
     title: event.title || event.nama_event || "Untitled Event",
@@ -43,9 +55,7 @@ function normalizeDetail(event, fallbackId) {
     description: event.description || event.deskripsi || "Deskripsi event belum tersedia.",
     harga: event.harga ?? null,
     event_type: event.event_type || 'offline',
-    foto_event_url:
-      event.foto_event_url ||
-      (event.foto_event ? buildApiUrl(`/event/${event.foto_event}`) : FALLBACK_IMAGE),
+    foto_event_url: finalFotoUrl,
   };
 }
 
