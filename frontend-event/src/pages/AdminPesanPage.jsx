@@ -47,6 +47,7 @@ export default function AdminPesanPage() {
   const [copiedId, setCopiedId] = useState(null);
   const [replyText, setReplyText] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   const token = getToken() || '';
   const authHeaders = { ...defaultHeaders, Authorization: `Bearer ${token}` };
@@ -79,7 +80,36 @@ export default function AdminPesanPage() {
 
   useEffect(() => {
     loadMessages();
-  }, []);
+    
+    // Polling for real-time updates every 10 seconds
+    const interval = setInterval(() => {
+      // Fetch in background without setting global loading state to avoid flicker
+      // We don't use 'loading' or 'isSending' in dependencies to avoid loops,
+      // instead we check them if needed, but since it's background polling,
+      // it's usually safe to just let it run.
+      fetch(buildApiUrl('/api/kontak-event'), { headers: authHeaders })
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data) {
+            const mapped = data.map(k => ({
+              id: k.id,
+              pengirim: k.nama,
+              email: k.email,
+              subjek: k.judul_event || 'Pesan Umum',
+              isi: k.pesan || '',
+              tanggal: k.created_at,
+              isRead: k.status !== 'pending',
+              balasan: k.balasan,
+              repliedAt: k.replied_at
+            }));
+            setMessages(mapped);
+          }
+        })
+        .catch(e => console.error('Background poll failed', e));
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, []); // Only run on mount
 
   /* ── Derived ────────────────────────────────────────── */
   const unreadCount = messages.filter(m => !m.isRead).length;
@@ -179,7 +209,9 @@ export default function AdminPesanPage() {
           isRead: true 
         } : m));
         setReplyText('');
-        alert('Balasan berhasil dikirim ke email pengirim!');
+        setShowSuccess(true);
+        // Automatically hide after 4 seconds
+        setTimeout(() => setShowSuccess(false), 4000);
       } else {
         alert('Gagal mengirim balasan: ' + (result.message || 'Error'));
       }
@@ -412,6 +444,21 @@ export default function AdminPesanPage() {
                 Pesan ini dikirim melalui sistem otomasi email KESAVENT.
               </p>
             </div>
+          </div>
+        </div>
+      )}
+      {/* ── Success Modal ───────────────────────────── */}
+      {showSuccess && (
+        <div className="apm-modal-overlay" onClick={() => setShowSuccess(false)}>
+          <div className="apm-modal-content" onClick={e => e.stopPropagation()}>
+            <div className="apm-modal-icon-wrap">
+              <CheckCircle size={48} color="#10b981" />
+            </div>
+            <h2>Pesan Terkirim!</h2>
+            <p>Balasan Anda telah berhasil dikirim ke email <strong>{selectedMessage?.email}</strong>.</p>
+            <button className="apm-btn-modal-close" onClick={() => setShowSuccess(false)}>
+              Tutup
+            </button>
           </div>
         </div>
       )}

@@ -17,7 +17,7 @@ class KontakEventController extends Controller
             'email' => $request->email,
             'no_hp' => $request->no_hp,
             'judul_event' => $request->judul_event,
-            'deskripsi_event' => $request->deskripsi_event,
+            'deskripsi_event' => $request->deskripsi_event ?? '',
             'pesan' => $request->pesan,
             'status' => 'pending'
         ]);

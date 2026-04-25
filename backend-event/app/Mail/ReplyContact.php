@@ -39,9 +39,10 @@ class ReplyContact extends Mailable
     public function content(): Content
     {
         return new Content(
-            markdown: 'emails.reply-contact',
+            view: 'emails.reply-contact',
             with: [
                 'nama' => $this->data['nama'],
+                'subjek' => $this->data['subjek'],
                 'pesan_asli' => $this->data['pesan_asli'],
                 'balasan' => $this->data['balasan'],
             ],

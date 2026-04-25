@@ -132,32 +132,7 @@ function CountdownTimer({ targetDate }) {
   );
 }
 
-const HERO_CARDS_FALLBACK = [
-  {
-    id: "h1",
-    title: "Neon Night Festival",
-    price: "Rp180rb",
-    handle: "@skylineent",
-    gradient: "linear-gradient(135deg, #7c3aed, #a78bfa)",
-    imageUrl: null,
-  },
-  {
-    id: "h2",
-    title: "Digital Summit 2026",
-    price: "Rp250rb",
-    handle: "@techverse",
-    gradient: "linear-gradient(135deg, #5b21b6, #8b5cf6)",
-    imageUrl: null,
-  },
-  {
-    id: "h3",
-    title: "Career & Meditation",
-    price: "Gratis",
-    handle: "@mindfulid",
-    gradient: "linear-gradient(135deg, #6d28d9, #a78bfa)",
-    imageUrl: null,
-  },
-];
+const HERO_CARDS_FALLBACK = [];
 
 function formatHeroPrice(harga) {
   const n = Number(harga);
@@ -168,6 +143,7 @@ function formatHeroPrice(harga) {
 /**  event terbaru dari backend; slot kosong diisi fallback agar tetap 3 kartu (layout sama) */
 function padHeroCardsToThree(fromApi) {
   if (fromApi.length >= 3) return fromApi.slice(0, 3);
+  if (HERO_CARDS_FALLBACK.length === 0) return fromApi; // Don't pad if no fallback
   const out = [...fromApi];
   let fi = 0;
   while (out.length < 3) {
@@ -213,131 +189,12 @@ function buildHeroCardsFromEvents(events) {
   return padHeroCardsToThree(fromApi);
 }
 
-const DEFAULT_NEAREST_EVENT = {
-  id: 0,
-  title: "Neon Night Music Festival Bandung",
-  date: "22 Mar 2026",
-  location: "Bandung, Jawa Barat",
-  category: "Music & Festival",
-  organizer: "Skyline Entertainment",
-  handle: "@skylineent",
-  imageGradient: "linear-gradient(135deg, #7c3aed, #a78bfa)",
-};
+const DEFAULT_NEAREST_EVENT = null;
 
-const DEMO_LATEST_EVENTS = [
-  {
-    id: "demo-1",
-    title: "Lunar Arcade Showcase",
-    date: "12 Apr 2026",
-    location: "Jakarta, Indonesia",
-    category: "Expo",
-    organizer: "ArcadeWorks",
-    imageGradient: "linear-gradient(135deg, #06b6d4, #6366f1)",
-  },
-  {
-    id: "demo-2",
-    title: "Neon Night Music Festival",
-    date: "22 Mar 2026",
-    location: "Bandung, Jawa Barat",
-    category: "Music & Festival",
-    organizer: "Skyline Entertainment",
-    imageGradient: "linear-gradient(135deg, #7c3aed, #a78bfa)",
-  },
-  {
-    id: "demo-3",
-    title: "Digital Innovation Summit 2026",
-    date: "05 Apr 2026",
-    location: "Surabaya, Jawa Timur",
-    category: "Conference",
-    organizer: "TechVerse ID",
-    imageGradient: "linear-gradient(135deg, #0ea5e9, #22c55e)",
-  },
-  {
-    id: "demo-4",
-    title: "Creators Meetup: UI Motion Lab",
-    date: "19 Apr 2026",
-    location: "Yogyakarta, DIY",
-    category: "Workshop",
-    organizer: "MotionLab",
-    imageGradient: "linear-gradient(135deg, #f97316, #fb7185)",
-  },
-  {
-    id: "demo-5",
-    title: "Indie Game Jam Weekend",
-    date: "26 Apr 2026",
-    location: "Online",
-    category: "Game",
-    organizer: "IndieHub",
-    imageGradient: "linear-gradient(135deg, #22c55e, #a3e635)",
-  },
-  {
-    id: "demo-6",
-    title: "Career & Meditation Classes",
-    date: "30 Mar 2026",
-    location: "Online Webinar",
-    category: "Business & Career",
-    organizer: "Mindful Growth ID",
-    imageGradient: "linear-gradient(135deg, #a855f7, #c084fc)",
-  },
-];
+const DEMO_LATEST_EVENTS = [];
 
 /** Fallback jika belum ada data dari API (isi + eventId null untuk CTA ke katalog) */
-const BANNER_CAROUSEL_FALLBACK = [
-  {
-    id: "banner-1",
-    eventId: null,
-    title: "Neon Night Music Festival",
-    subtitle: "Pengalaman musik terbaik tahun ini",
-    date: "22 MAR 2026",
-    image: "linear-gradient(135deg, #7c3aed, #a78bfa)",
-    foto_event_url: null,
-  },
-  {
-    id: "banner-2",
-    eventId: null,
-    title: "Digital Innovation Summit",
-    subtitle: "Networking dengan para pemimpin teknologi",
-    date: "05 APR 2026",
-    image: "linear-gradient(135deg, #0ea5e9, #22c55e)",
-    foto_event_url: null,
-  },
-  {
-    id: "banner-3",
-    eventId: null,
-    title: "Creative Workshop Intensive",
-    subtitle: "Tingkatkan skill kreatif Anda bersama expert",
-    date: "19 APR 2026",
-    image: "linear-gradient(135deg, #f97316, #fb7185)",
-    foto_event_url: null,
-  },
-  {
-    id: "banner-4",
-    eventId: null,
-    title: "Gaming Festival 2026",
-    subtitle: "Kompetisi game terbesar se-Indonesia",
-    date: "26 APR 2026",
-    image: "linear-gradient(135deg, #22c55e, #a3e635)",
-    foto_event_url: null,
-  },
-  {
-    id: "banner-5",
-    eventId: null,
-    title: "Business & Career Fair",
-    subtitle: "Cari peluang karir impian Anda",
-    date: "30 MAR 2026",
-    image: "linear-gradient(135deg, #a855f7, #c084fc)",
-    foto_event_url: null,
-  },
-  {
-    id: "banner-6",
-    eventId: null,
-    title: "Tech Expo Indonesia",
-    subtitle: "Showcase inovasi teknologi terdepan",
-    date: "12 APR 2026",
-    image: "linear-gradient(135deg, #06b6d4, #6366f1)",
-    foto_event_url: null,
-  },
-];
+const BANNER_CAROUSEL_FALLBACK = [];
 
 function truncateBannerText(text, max = 130) {
   const t = (text || "").trim().replace(/\s+/g, " ");
@@ -390,69 +247,7 @@ function buildBannerSlidesFromEvents(events) {
   });
 }
 
-const NEWS_DATA = [
-  {
-
-    id: "news-1",
-    title: "5 Tren Event Technology 2026 yang Wajib Diketahui",
-    date: "31 Mar 2026",
-    category: "Technology",
-    source: "EventNews",
-    excerpt: "Teknologi event terus berkembang dengan inovasi-inovasi terbaru. Pelajari 5 tren utama yang akan mendominasi industri event tahun ini.",
-    content: "Dalam artikel mendalam ini, kami mengeksplorasi dampak AI, VR, dan blockchain dalam industri event. Dari virtual venue hingga smart ticketing, pelajari cara teknologi mengubah cara orang mengalami live events.",
-    image: "linear-gradient(135deg, #667eea, #764ba2)",
-  },
-  {
-    id: "news-2",
-    title: "Panduan Cara Memilih Event yang Tepat untuk Anda",
-    date: "30 Mar 2026",
-    category: "Tips & Tricks",
-    source: "KESAVENT Magazine",
-    excerpt: "Memilih event yang sesuai dengan minat dan kebutuhan penting untuk pengalaman terbaik.",
-    content: "Tidak semua event cocok untuk semua orang. Guide lengkap ini membantu Anda menemukan event yang sempurna, mulai dari musik, konferensi, hingga workshop networking.",
-    image: "linear-gradient(135deg, #f093fb, #f5576c)",
-  },
-  {
-    id: "news-3",
-    title: "Cerita Sukses: Dari Peserta Event hingga Menjadi Entrepreneur",
-    date: "29 Mar 2026",
-    category: "Inspirasi",
-    source: "KESAVENT Stories",
-    excerpt: "Temui kisah inspiratif dari peserta event yang berhasil mengubah kehidupan mereka.",
-    content: "Melalui networking dan pembelajaran di event, banyak individu yang menemukan peluang bisnis mereka. Baca cerita lengkap dari berbagai entrepreneur sukses yang dimulai dari event.",
-    image: "linear-gradient(135deg, #4facfe, #00f2fe)",
-  },
-  {
-    id: "news-4",
-    title: "Event Online vs Offline: Mana yang Lebih Baik?",
-    date: "28 Mar 2026",
-    category: "Analysis",
-    source: "Event Research",
-    excerpt: "Analisis mendalam tentang kelebihan dan kekurangan event online dan offline.",
-    content: "Setelah pandemi, hybrid event menjadi format populer. Bandingkan pengalaman, networking, dan ROI antara format online, offline, dan hybrid untuk memilih yang terbaik untuk kebutuhan Anda.",
-    image: "linear-gradient(135deg, #fa709a, #fee140)",
-  },
-  {
-    id: "news-5",
-    title: "Sponsorship Event: Cara Efektif Mempromosikan Brand",
-    date: "27 Mar 2026",
-    category: "Business",
-    source: "Marketing Insights",
-    excerpt: "Strategi sponsorship yang tepat dapat meningkatkan visibilitas brand secara eksponensial.",
-    content: "Belajar cara memilih event yang tepat untuk sponsor, mengukur ROI, dan memaksimalkan impact dari investasi sponsorship Anda.",
-    image: "linear-gradient(135deg, #a8edea, #fed6e3)",
-  },
-  {
-    id: "news-6",
-    title: "Networking Tips di Event: Bangun Koneksi yang Bermakna",
-    date: "26 Mar 2026",
-    category: "Tips & Tricks",
-    source: "Professional Tips",
-    excerpt: "Networking adalah salah satu nilai terbesar dari menghadiri event. Pelajari cara membangun hubungan profesional.",
-    content: "Tips praktis untuk memulai percakapan, membuat kesan pertama yang baik, dan melanjutkan hubungan setelah event berakhir.",
-    image: "linear-gradient(135deg, #ff9a56, #ff6a91)",
-  },
-];
+const NEWS_DATA = [];
 
 const GRADIENT_COLORS = [
   "linear-gradient(135deg, #667eea, #764ba2)",
@@ -678,14 +473,7 @@ export default function HomePage() {
       };
     }
     if (!events.length) {
-      return {
-        ...DEFAULT_NEAREST_EVENT,
-        tanggal: DEFAULT_NEAREST_EVENT.date,
-        date: DEFAULT_NEAREST_EVENT.date,
-        dateLabel: DEFAULT_NEAREST_EVENT.date,
-        foto_event_url: null,
-        id: null,
-      };
+      return null;
     }
     return null;
   }, [activeUpcoming, events.length]);

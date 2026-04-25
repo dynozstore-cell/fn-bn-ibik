@@ -54,4 +54,9 @@ class Event extends Model
     {
         return $this->belongsTo(User::class, 'user_id', 'id_user');
     }
+
+    public function pendaftaran()
+    {
+        return $this->hasMany(PendaftaranEvent::class, 'event_id');
+    }
 }

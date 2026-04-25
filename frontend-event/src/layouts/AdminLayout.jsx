@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { getUser } from '../utils/auth';
+import { getUser, getToken } from '../utils/auth';
+import { buildApiUrl, defaultHeaders } from '../utils/api';
 import LOGO_IBIK from '../assets/LOGO_IBIK.png';
 import { LayoutDashboard, CalendarDays, Users, ShieldCheck, FileText, MessageSquare, Settings, UserCircle, Menu, X, LogOut } from 'lucide-react';
 import '../styles/AdminPanel.css';
@@ -16,11 +17,36 @@ export default function AdminLayout() {
 
   const location = useLocation();
 
-  React.useEffect(() => {
+  const [pendingMessageCount, setPendingMessageCount] = useState(0);
+
+  useEffect(() => {
     const authUser = getUser();
     if (!authUser || String(authUser.role).toLowerCase() !== "admin") {
       navigate("/login", { state: { from: location }, replace: true });
+      return;
     }
+
+    const fetchPendingCount = async () => {
+      try {
+        const token = getToken();
+        if (!token) return;
+        const res = await fetch(buildApiUrl('/api/kontak-event'), {
+          headers: { ...defaultHeaders, Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          // Status 'pending' are those that haven't been replied/read
+          const pending = Array.isArray(data) ? data.filter(m => m.status === 'pending') : [];
+          setPendingMessageCount(pending.length);
+        }
+      } catch (err) {
+        console.error("Failed to fetch pending messages:", err);
+      }
+    };
+
+    fetchPendingCount();
+    const interval = setInterval(fetchPendingCount, 10000); // 10 seconds
+    return () => clearInterval(interval);
   }, [navigate, location]);
 
   const navItems = [
@@ -62,7 +88,17 @@ export default function AdminLayout() {
               onClick={() => setIsSidebarOpen(false)}
             >
               {item.icon}
-              {item.label}
+              <span style={{ flex: 1 }}>{item.label}</span>
+              {item.path === '/admin/pesan' && pendingMessageCount > 0 && (
+                <span style={{
+                  background: '#ef4444', color: '#fff', fontSize: '0.7rem', fontWeight: 800,
+                  minWidth: '20px', height: '20px', borderRadius: '10px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  padding: '0 6px', marginLeft: '8px', boxShadow: '0 0 10px rgba(239,68,68,0.3)'
+                }}>
+                  {pendingMessageCount > 99 ? '99+' : pendingMessageCount}
+                </span>
+              )}
             </NavLink>
           ))}
         </nav>

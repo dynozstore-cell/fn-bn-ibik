@@ -192,15 +192,6 @@ export default function ContactPage() {
                     </div>
                   </div>
 
-                  {/* Deskripsi */}
-                  <div className="form-group">
-                    <label htmlFor="deskripsi_event">Deskripsi</label>
-                    <input
-                      id="deskripsi_event" name="deskripsi_event"
-                      value={form.deskripsi_event} onChange={handleChange}
-                      placeholder="Gambaran singkat keperluan Anda..."
-                    />
-                  </div>
 
                   {/* Pesan */}
                   <div className="form-group">

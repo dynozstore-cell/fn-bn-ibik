@@ -49,6 +49,7 @@ export default function AdminPenyelenggaraPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
 
   // Filter & Pagination
   const [search, setSearch] = useState('');
@@ -226,6 +227,9 @@ export default function AdminPenyelenggaraPage() {
       }
       await loadPenyelenggara();
       setShowModal(false);
+      if (!editId) {
+        setShowSuccessPopup(true);
+      }
     } catch (err) {
       setError(err.message || 'Terjadi kesalahan saat menyimpan penyelenggara.');
     } finally {
@@ -545,6 +549,19 @@ export default function AdminPenyelenggaraPage() {
                 <button type="submit" className="apg-btn-submit">{editId ? 'Simpan Perubahan' : 'Tambahkan'}</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Success Popup */}
+      {showSuccessPopup && (
+        <div className="apg-success-popup">
+          <div className="apg-success-content">
+            <div className="apg-success-icon">
+              <CheckCircle size={32} />
+            </div>
+            <h3>Akun Dibuat</h3>
+            <p>Penyelenggara baru telah berhasil ditambahkan ke sistem.</p>
+            <button className="apg-success-btn" onClick={() => setShowSuccessPopup(false)}>Oke</button>
           </div>
         </div>
       )}

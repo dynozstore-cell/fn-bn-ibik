@@ -24,7 +24,7 @@ class EventController extends Controller
     public function index()
     {
         $user = Auth::guard('sanctum')->user();
-        $query = Event::with(['kategori', 'penyelenggara']);
+        $query = Event::with(['kategori', 'penyelenggara'])->withCount('pendaftaran');
 
         // Jika request membawa token dan rolenya penyelenggara, kembalikan hanya event miliknya
         if ($user && $user->role === 'penyelenggara') {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Save, Calendar, MapPin, Users, Tag, FileText, Image, Clock, Plus, Trash2, GripVertical, Settings2, ListPlus, X } from 'lucide-react';
+import { Save, Calendar, MapPin, Users, Tag, FileText, Image, Clock, Plus, Trash2, GripVertical, Settings2, ListPlus, X, CheckCircle } from 'lucide-react';
 import '../styles/AdminDashboard.css';
 import { buildApiUrl } from '../utils/api';
 import { getToken } from '../utils/auth';
@@ -61,6 +61,7 @@ export default function PenyelenggaraBuatEventPage() {
   const [posterFile, setPosterFile] = useState(null);
   const [uploadingPoster, setUploadingPoster] = useState(false);
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
 
   // State for Custom Form Builder
   const [customFields, setCustomFields] = useState([
@@ -248,9 +249,8 @@ export default function PenyelenggaraBuatEventPage() {
       console.log('Response:', { status: response.status, body: result });
 
       if (response.ok) {
-        alert(`Event berhasil ${id ? 'diupdate' : 'disimpan'}!`);
-        console.log('Event created/updated:', result);
         if (!id) {
+          setShowSuccessPopup(true);
           // Reset form
           setForm({
             nama: '', kategori: '', tanggal: '', waktu_mulai: '', waktu_selesai: '',
@@ -712,6 +712,22 @@ export default function PenyelenggaraBuatEventPage() {
           </div>
         </div>
       </form>
+      {/* Success Popup */}
+      {showSuccessPopup && (
+        <div className="apg-success-popup">
+          <div className="apg-success-content">
+            <div className="apg-success-icon">
+              <CheckCircle size={32} />
+            </div>
+            <h3>Event Berhasil Dibuat</h3>
+            <p>Event Anda telah berhasil disimpan dan dipublikasikan ke publik.</p>
+            <button type="button" className="apg-success-btn" onClick={() => {
+              setShowSuccessPopup(false);
+              navigate('/penyelenggara/events');
+            }}>Lihat Daftar Event</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

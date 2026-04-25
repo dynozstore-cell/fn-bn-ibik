@@ -98,7 +98,7 @@ export default function PenyelenggaraEventsPage() {
       const status = evDate >= today ? 'aktif' : 'selesai';
       return {
         ...ev,
-        peserta: 0, // Mock: would come from backend
+        peserta: ev.pendaftaran_count || 0, // Use real count if available
         kapasitas: ev.harga > 0 ? 100 : 50,
         statusVal: status
       };
@@ -175,7 +175,7 @@ export default function PenyelenggaraEventsPage() {
       const nama = e.nama_event || "Untitled";
       return {
         name: nama.length > 15 ? nama.substring(0, 15) + "..." : nama,
-        peserta: e.peserta || Math.floor(Math.random() * 50),
+        peserta: e.peserta || 0,
         kapasitas: e.kapasitas || 100,
         color: e.statusVal === "aktif" ? "#10b981" : "#0ea5e9"
       };
@@ -186,7 +186,7 @@ export default function PenyelenggaraEventsPage() {
   const totalEvent = events.length;
   const upcoming = events.filter(e => e.statusVal === "aktif").length;
   const selesai = totalEvent - upcoming;
-  const totalPeserta = events.reduce((sum, e) => sum + (e.peserta || 0), 0) + Math.floor(Math.random() * 200); // Mocking total
+  const totalPeserta = events.reduce((sum, e) => sum + (Number(e.peserta) || 0), 0);
 
   /* ── Pagination range ────────────────────────────────── */
   function getPageRange(cur, total) {
